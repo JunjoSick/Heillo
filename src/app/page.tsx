@@ -210,9 +210,9 @@ export default function Home() {
         </div>
       </section>
 
-      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-5 lg:grid-cols-[minmax(0,1fr)_24rem] lg:px-6">
-        <div className="grid min-w-0 gap-5">
-          <section className="rounded border border-moss/15 bg-white p-4 shadow-sm">
+      <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-5 lg:flex-row lg:items-start lg:px-6">
+        <div className="grid min-w-0 flex-1 gap-5">
+          <section className="min-w-0 rounded border border-moss/15 bg-white p-4 shadow-sm">
             <WordInput
               buttonLabel="Start"
               icon={Play}
@@ -236,7 +236,7 @@ export default function Home() {
             ) : null}
           </section>
 
-          <section className="rounded border border-moss/15 bg-white p-4 shadow-sm">
+          <section className="min-w-0 rounded border border-moss/15 bg-white p-4 shadow-sm">
             <WordInput
               buttonLabel={canAcceptVerifiedCandidate(candidateInput) ? "Accept" : "Verify"}
               disabled={!currentEntry}
@@ -284,7 +284,7 @@ export default function Home() {
           <OnboardingBox />
         </div>
 
-        <aside className="grid min-w-0 content-start gap-5">
+        <aside className="grid w-full min-w-0 shrink-0 content-start gap-5 lg:sticky lg:top-5 lg:w-96">
           <SettingsPanel onChange={setSettings} settings={settings} />
           <CustomWordsPanel
             customWords={customWords}

@@ -52,7 +52,7 @@ export function SettingsPanel({ settings, onChange }: SettingsPanelProps) {
   const [open, setOpen] = useState(false);
 
   return (
-    <section className="rounded border border-moss/15 bg-white p-4 shadow-sm">
+    <section className="min-w-0 rounded border border-moss/15 bg-white p-4 shadow-sm">
       <button
         aria-expanded={open}
         className="flex w-full items-center justify-between gap-3 text-left"

@@ -20,17 +20,17 @@ export function CustomWordsPanel({
   onExport
 }: CustomWordsPanelProps) {
   return (
-    <section className="rounded border border-moss/15 bg-white p-4 shadow-sm">
+    <section className="min-w-0 rounded border border-moss/15 bg-white p-4 shadow-sm">
       <h2 className="text-base font-semibold text-ink">Custom Words</h2>
-      <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
+      <div className="mt-3 grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
         <input
-          className="h-10 rounded border border-moss/25 bg-white px-3 text-sm"
+          className="h-10 w-full min-w-0 rounded border border-moss/25 bg-white px-3 text-sm"
           onChange={(event) => onManualWordChange(event.target.value)}
           placeholder="correvo"
           value={manualWord}
         />
         <button
-          className="inline-flex h-10 items-center justify-center gap-2 rounded bg-moss px-3 text-sm font-semibold text-white"
+          className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded bg-moss px-3 text-sm font-semibold text-white"
           onClick={onAddWord}
           title="Add custom word"
           type="button"
