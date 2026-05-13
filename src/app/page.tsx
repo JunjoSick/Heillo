@@ -1,15 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Check, Play, Search } from "lucide-react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Bridge } from "@/components/chain/Bridge";
+import { DockInput } from "@/components/chain/DockInput";
+import { Legend } from "@/components/chain/Legend";
+import { TopBar } from "@/components/chain/TopBar";
+import { WordRow } from "@/components/chain/WordRow";
+import { classifyChain, type ChainOp } from "@/components/chain/diff";
 import { CustomWordsPanel } from "@/components/CustomWordsPanel";
-import { MoveResult } from "@/components/MoveResult";
-import { OnboardingBox } from "@/components/OnboardingBox";
-import { PathView } from "@/components/PathView";
-import { PhonemeView } from "@/components/PhonemeView";
 import { SettingsPanel } from "@/components/SettingsPanel";
-import { SuggestionsPanel } from "@/components/SuggestionsPanel";
-import { WordInput } from "@/components/WordInput";
 import {
   loadCustomWords,
   saveCustomWord
@@ -26,36 +25,48 @@ import {
 } from "@/lib/phonetics";
 import { appendMove, canAcceptMove } from "@/lib/path/pathRules";
 import { defaultSettings } from "@/lib/settings/defaultSettings";
-import type { GameSettings, MoveValidation, PathEntry, Suggestion } from "@/lib/types";
+import type {
+  GameSettings,
+  MoveValidation,
+  PathEntry,
+  Suggestion
+} from "@/lib/types";
+
+const START_WORD = "gioco";
+
+function makeInitialPath(): PathEntry[] {
+  return [{ word: makePhoneticWord(START_WORD) }];
+}
 
 export default function Home() {
+  const [path, setPath] = useState<PathEntry[]>(() => makeInitialPath());
+  const [draft, setDraft] = useState("");
+  const [validation, setValidation] = useState<MoveValidation | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+
   const [dictionary, setDictionary] = useState<string[]>([]);
   const [dictionaryError, setDictionaryError] = useState<string | null>(null);
-  const [dictionaryLoading, setDictionaryLoading] = useState(true);
   const [customWords, setCustomWords] = useState<string[]>([]);
   const [settings, setSettings] = useState<GameSettings>(defaultSettings);
-  const [startInput, setStartInput] = useState("gioco");
-  const [candidateInput, setCandidateInput] = useState("");
-  const [path, setPath] = useState<PathEntry[]>([]);
-  const [validation, setValidation] = useState<MoveValidation | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
   const [manualWord, setManualWord] = useState("");
   const [exportText, setExportText] = useState("");
 
+  const chainScrollRef = useRef<HTMLElement>(null);
+
   useEffect(() => {
     setCustomWords(loadCustomWords());
-
     loadDictionary()
       .then((words) => {
         setDictionary(words);
         setDictionaryError(null);
       })
       .catch((error: unknown) => {
-        setDictionaryError(error instanceof Error ? error.message : "Dictionary load failed.");
-      })
-      .finally(() => setDictionaryLoading(false));
+        setDictionaryError(
+          error instanceof Error ? error.message : "Dictionary load failed."
+        );
+      });
   }, []);
 
   const dictionaryContext = useMemo(
@@ -64,228 +75,284 @@ export default function Home() {
   );
 
   const currentEntry = path[path.length - 1];
-  const hasValidation = validation !== null;
+  const currentWord = currentEntry?.word.raw ?? "";
+
+  // Live preview op from the char-level diff (visual classification only).
+  const preview: { word: string; op: ChainOp } | null = useMemo(() => {
+    const w = draft.trim().toLowerCase();
+    if (!w || w === currentWord.toLowerCase()) return null;
+    return { word: w, op: classifyChain(currentWord, w) };
+  }, [draft, currentWord]);
+
+  // Compute validation in response to draft changes so we can decide acceptability.
+  useEffect(() => {
+    if (!currentEntry || !preview) {
+      setValidation(null);
+      return;
+    }
+    if (preview.op.type === "invalid" || preview.op.type === "noop") {
+      setValidation(null);
+      return;
+    }
+    const next = validateMove(
+      currentEntry.word.raw,
+      preview.word,
+      settings,
+      dictionaryContext
+    );
+    setValidation(next);
+  }, [preview, currentEntry, settings, dictionaryContext]);
+
   const acceptedMoves = useMemo(
-    () => path.map((entry) => entry.move).filter(Boolean) as MoveValidation[],
+    () => path.map((e) => e.move).filter(Boolean) as MoveValidation[],
     [path]
   );
   const acceptance = useMemo(
     () =>
-      validation
-        ? canAcceptMove(acceptedMoves, validation, settings)
-        : null,
+      validation ? canAcceptMove(acceptedMoves, validation, settings) : null,
     [acceptedMoves, settings, validation]
   );
 
+  const canAccept = Boolean(
+    validation &&
+      acceptance?.accepted &&
+      preview &&
+      casefoldTrim(preview.word) === casefoldTrim(validation.to.raw)
+  );
+
+  // Auto-scroll to bottom when path grows or preview changes.
   useEffect(() => {
-    if (!currentEntry || !candidateInput || !hasValidation) {
-      return;
-    }
+    const el = chainScrollRef.current;
+    if (!el) return;
+    const id = window.requestAnimationFrame(() => {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [path.length, preview?.word]);
 
-    setValidation(
-      validateMove(currentEntry.word.raw, candidateInput, settings, dictionaryContext)
-    );
-  }, [settings, dictionaryContext, currentEntry, candidateInput, hasValidation]);
+  function flashMessage(message: string) {
+    setFlash(message);
+    window.setTimeout(() => setFlash((cur) => (cur === message ? null : cur)), 1800);
+  }
 
-  function startPath() {
-    const unsupported = getUnsupportedWordReason(startInput);
-
+  function handleAccept() {
+    if (!preview || !currentEntry) return;
+    const unsupported = getUnsupportedWordReason(preview.word);
     if (unsupported) {
-      setMessage(unsupported);
+      flashMessage(unsupported);
       return;
     }
-
-    setPath([{ word: makePhoneticWord(startInput) }]);
-    setCandidateInput("");
+    if (!validation) {
+      const next = validateMove(
+        currentEntry.word.raw,
+        preview.word,
+        settings,
+        dictionaryContext
+      );
+      setValidation(next);
+      const acc = canAcceptMove(acceptedMoves, next, settings);
+      if (!acc.accepted) {
+        flashMessage(acc.message);
+        return;
+      }
+      setPath((p) => appendMove(p, next));
+      setDraft("");
+      setValidation(null);
+      flashMessage(`accepted: ${preview.word}`);
+      return;
+    }
+    if (!acceptance?.accepted) {
+      flashMessage(acceptance?.message ?? "invalid move");
+      return;
+    }
+    setPath((p) => appendMove(p, validation));
+    setDraft("");
     setValidation(null);
-    setSuggestions([]);
-    setMessage(null);
+    flashMessage(`accepted: ${preview.word}`);
   }
 
-  function canAcceptVerifiedCandidate(word: string): boolean {
-    return Boolean(
-      validation &&
-        acceptance?.accepted &&
-        casefoldTrim(word) === casefoldTrim(validation.to.raw) &&
-        currentEntry?.word.normalized === validation.from.normalized
-    );
+  function handleUndo() {
+    if (path.length <= 1) {
+      flashMessage("nothing to undo");
+      return;
+    }
+    setPath((p) => p.slice(0, -1));
+    flashMessage("undid one step");
   }
 
-  function verifyCandidate(word = candidateInput) {
-    if (!currentEntry) {
-      setMessage("Start a word before verifying a candidate.");
-      return;
-    }
-
-    if (canAcceptVerifiedCandidate(word)) {
-      acceptMove();
-      return;
-    }
-
-    const unsupported = getUnsupportedWordReason(word);
-
-    if (unsupported) {
-      setMessage(unsupported);
-      return;
-    }
-
-    setCandidateInput(word);
-    setValidation(validateMove(currentEntry.word.raw, word, settings, dictionaryContext));
-    setMessage(null);
-  }
-
-  function acceptMove() {
-    if (!validation || !acceptance?.accepted) {
-      return;
-    }
-
-    setPath((currentPath) => appendMove(currentPath, validation));
-    setCandidateInput("");
+  function handleReset() {
+    setPath(makeInitialPath());
+    setDraft("");
     setValidation(null);
-    setSuggestions([]);
-    setMessage("Move accepted.");
+    flashMessage("reset to start");
   }
 
   function addCustomWord(word: string) {
     const unsupported = getUnsupportedWordReason(word);
-
     if (unsupported) {
-      setMessage(unsupported);
+      flashMessage(unsupported);
       return;
     }
-
-    const nextWords = saveCustomWord(word);
-    setCustomWords(nextWords);
+    const next = saveCustomWord(word);
+    setCustomWords(next);
     setManualWord("");
-    setMessage(`${word.trim()} added to local overrides.`);
+    flashMessage(`${word.trim()} added`);
   }
 
-  function generateSuggestions() {
-    if (!currentEntry) {
-      setMessage("Start a word before generating suggestions.");
-      return;
-    }
+  const dockSuggestions = useMemo(() => {
+    if (!currentEntry || dictionaryContext.allWords.length === 0) return [] as string[];
+    if (suggestions.length > 0) return suggestions.slice(0, 3).map((s) => s.word);
+    const cheap = suggestNextWords(
+      currentEntry.word.raw,
+      dictionaryContext.allWords,
+      settings,
+      dictionaryContext
+    );
+    return cheap.slice(0, 3).map((s) => s.word);
+  }, [currentEntry, dictionaryContext, settings, suggestions]);
 
-    setSuggestionsLoading(true);
-    setMessage(null);
+  useEffect(() => {
+    setSuggestions([]);
+  }, [path.length]);
 
-    window.setTimeout(() => {
-      const nextSuggestions = suggestNextWords(
-        currentEntry.word.raw,
-        dictionaryContext.allWords,
-        settings,
-        dictionaryContext
-      );
-      setSuggestions(nextSuggestions);
-      setSuggestionsLoading(false);
-    }, 0);
-  }
+  const buttonLabel = preview ? (canAccept ? "accept" : "verify") : "verify";
 
   return (
-    <main className="min-h-screen bg-paper">
-      <section className="border-b border-moss/15 bg-mist">
-        <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 lg:grid-cols-[1fr_22rem] lg:px-6">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-normal text-clay">
-              Heillo
-            </p>
-            <h1 className="mt-2 text-3xl font-semibold text-ink sm:text-4xl">
-              Italian phonetic move tester
-            </h1>
-            <p className="mt-3 max-w-3xl text-base leading-7 text-moss">
-              Deterministic move validation for roadmap playtesting: transcribe,
-              compare, explain, tune, and accept path progress.
-            </p>
-          </div>
-          <div className="rounded border border-moss/15 bg-white p-4 shadow-sm">
-            <div className="text-sm font-semibold text-ink">Dictionary</div>
-            <div className="mt-2 text-3xl font-semibold text-ink">
-              {dictionaryLoading ? "..." : dictionary.length.toLocaleString()}
-            </div>
-            <div className="mt-1 text-sm text-moss">loaded words</div>
-            {dictionaryError ? (
-              <p className="mt-2 text-sm text-clay">{dictionaryError}</p>
-            ) : null}
-          </div>
-        </div>
-      </section>
+    <div
+      style={{
+        height: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        position: "relative",
+        overflow: "hidden",
+        background: "var(--paper)"
+      }}
+    >
+      <TopBar
+        onMenuClick={() => setMenuOpen((v) => !v)}
+        menuOpen={menuOpen}
+      />
+      <Legend />
 
-      <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-5 lg:flex-row lg:items-start lg:px-6">
-        <div className="grid min-w-0 flex-1 gap-5">
-          <section className="min-w-0 rounded border border-moss/15 bg-white p-4 shadow-sm">
-            <WordInput
-              buttonLabel="Start"
-              icon={Play}
-              label="Starting word"
-              onChange={setStartInput}
-              onSubmit={startPath}
-              placeholder="gioco"
-              value={startInput}
-            />
-            {currentEntry ? (
-              <div className="mt-4 grid gap-2">
-                <div className="text-sm font-semibold text-moss">
-                  Current phonemes
+      <main
+        ref={chainScrollRef}
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflow: "auto",
+          display: "flex",
+          flexDirection: "column",
+          position: "relative",
+          zIndex: 1,
+          scrollbarWidth: "thin"
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "stretch",
+            justifyContent: "flex-start",
+            maxWidth: 720,
+            margin: "0 auto",
+            padding: "16px 24px 24px",
+            gap: 4,
+            minHeight: "100%",
+            width: "100%",
+            boxSizing: "border-box"
+          }}
+        >
+          <div style={{ flex: 1, minHeight: 12 }} />
+
+          {path.map((entry, i) => {
+            const isStart = i === 0;
+            const op: ChainOp | null = isStart
+              ? null
+              : classifyChain(path[i - 1].word.raw, entry.word.raw);
+            return (
+              <Fragment key={i + "-" + entry.word.raw}>
+                {!isStart && op ? (
+                  <div className="bridge-in">
+                    <Bridge op={op} />
+                  </div>
+                ) : null}
+                <div className="row-in">
+                  <WordRow
+                    word={entry.word.raw}
+                    op={op}
+                    isStart={isStart}
+                    index={i}
+                    latest={i === path.length - 1 && !preview}
+                  />
+                  {isStart ? <StartCaption /> : null}
                 </div>
-                <PhonemeView phonemes={currentEntry.word.phonemes} />
-                <div className="text-xs text-moss">
-                  Input: {currentEntry.word.raw} · Normalized:{" "}
-                  {currentEntry.word.normalized}
-                </div>
+              </Fragment>
+            );
+          })}
+
+          {preview ? (
+            <>
+              <div className="bridge-in" key={"pv-br-" + preview.word}>
+                <Bridge op={preview.op} />
               </div>
-            ) : null}
-          </section>
-
-          <section className="min-w-0 rounded border border-moss/15 bg-white p-4 shadow-sm">
-            <WordInput
-              buttonLabel={canAcceptVerifiedCandidate(candidateInput) ? "Accept" : "Verify"}
-              disabled={!currentEntry}
-              icon={canAcceptVerifiedCandidate(candidateInput) ? Check : Search}
-              label="Next word"
-              onChange={setCandidateInput}
-              onSubmit={() => verifyCandidate()}
-              placeholder="geco"
-              value={candidateInput}
-            />
-          </section>
-
-          {message ? (
-            <div className="rounded border border-gold/30 bg-gold/15 px-4 py-3 text-sm text-ink">
-              {message}
-            </div>
+              <div
+                className="row-in"
+                key={"pv-row-" + preview.word}
+                style={{ opacity: 0.96 }}
+              >
+                <WordRow
+                  word={preview.word}
+                  op={preview.op}
+                  isStart={false}
+                  index={path.length}
+                  latest
+                />
+                <PreviewCaption
+                  op={preview.op}
+                  canAccept={canAccept}
+                  acceptanceMessage={
+                    !canAccept ? acceptance?.message ?? null : null
+                  }
+                />
+              </div>
+            </>
           ) : null}
 
-          <MoveResult
-            acceptance={acceptance}
-            onAccept={acceptMove}
-            onAcceptWord={() => validation && addCustomWord(validation.to.raw)}
-            validation={validation}
-          />
-
-          <PathView
-            maxCompoundStreak={settings.maxCompoundStreak}
-            onReset={() => {
-              setPath([]);
-              setValidation(null);
-              setSuggestions([]);
-              setMessage(null);
-            }}
-            path={path}
-          />
-
-          <SuggestionsPanel
-            disabled={!currentEntry || dictionaryContext.allWords.length === 0}
-            loading={suggestionsLoading}
-            onGenerate={generateSuggestions}
-            onUseSuggestion={verifyCandidate}
-            suggestions={suggestions}
-          />
-
-          <OnboardingBox />
+          <div style={{ height: 24 }} />
         </div>
+      </main>
 
-        <aside className="grid w-full min-w-0 shrink-0 content-start gap-5 lg:sticky lg:top-5 lg:w-96">
-          <SettingsPanel onChange={setSettings} settings={settings} />
+      <DockInput
+        value={draft}
+        onChange={setDraft}
+        onAccept={handleAccept}
+        buttonLabel={buttonLabel}
+        canAccept={canAccept}
+        onUndo={handleUndo}
+        onReset={handleReset}
+        stepNumber={path.length}
+        flash={flash}
+        suggestions={dockSuggestions}
+        onPickSuggestion={setDraft}
+      />
+
+      {menuOpen ? (
+        <SidePanel onClose={() => setMenuOpen(false)}>
+          {dictionaryError ? (
+            <div
+              style={{
+                margin: "0 0 12px",
+                padding: "8px 10px",
+                borderRadius: 8,
+                background: "var(--del-bg)",
+                color: "var(--del)",
+                fontSize: 12
+              }}
+            >
+              {dictionaryError}
+            </div>
+          ) : null}
+          <SettingsPanel settings={settings} onChange={setSettings} />
           <CustomWordsPanel
             customWords={customWords}
             exportText={exportText}
@@ -294,8 +361,164 @@ export default function Home() {
             onExport={() => setExportText(exportCustomWords(customWords))}
             onManualWordChange={setManualWord}
           />
-        </aside>
+        </SidePanel>
+      ) : null}
+    </div>
+  );
+}
+
+function StartCaption() {
+  return (
+    <div
+      style={{
+        textAlign: "center",
+        margin: "6px 0 14px",
+        fontFamily: '"Instrument Serif", serif',
+        fontSize: 18,
+        fontStyle: "italic",
+        color: "var(--moss)"
+      }}
+    >
+      ↑ scroll up to wander back to the start — ↓ keep going
+    </div>
+  );
+}
+
+function PreviewCaption({
+  op,
+  canAccept,
+  acceptanceMessage
+}: {
+  op: ChainOp;
+  canAccept: boolean;
+  acceptanceMessage: string | null;
+}) {
+  if (op.type === "noop") return null;
+  if (op.type === "invalid") {
+    return (
+      <div
+        style={{
+          textAlign: "center",
+          marginTop: 6,
+          color: "var(--del)",
+          fontFamily: '"Geist Mono", monospace',
+          fontSize: 11
+        }}
+      >
+        invalid move
       </div>
-    </main>
+    );
+  }
+  if (!canAccept && acceptanceMessage) {
+    return (
+      <div
+        style={{
+          textAlign: "center",
+          marginTop: 6,
+          color: "var(--del)",
+          fontFamily: '"Geist Mono", monospace',
+          fontSize: 11,
+          letterSpacing: "0.04em"
+        }}
+      >
+        {acceptanceMessage}
+      </div>
+    );
+  }
+  return (
+    <div
+      style={{
+        textAlign: "center",
+        marginTop: 6,
+        fontFamily: '"Geist Mono", monospace',
+        fontSize: 11,
+        color: "var(--moss)",
+        letterSpacing: "0.04em"
+      }}
+    >
+      preview — press{" "}
+      <kbd
+        style={{
+          display: "inline-block",
+          padding: "1px 6px",
+          borderRadius: 5,
+          background: "#fff",
+          border: "1px solid rgba(20,18,12,0.18)",
+          fontFamily: '"Geist Mono", monospace',
+          fontSize: 11
+        }}
+      >
+        ↵
+      </kbd>{" "}
+      to accept
+    </div>
+  );
+}
+
+function SidePanel({
+  children,
+  onClose
+}: {
+  children: React.ReactNode;
+  onClose: () => void;
+}) {
+  return (
+    <>
+      <div
+        onClick={onClose}
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(20,18,12,0.18)",
+          zIndex: 50
+        }}
+      />
+      <aside
+        style={{
+          position: "fixed",
+          top: 0,
+          right: 0,
+          bottom: 0,
+          width: "min(420px, 92vw)",
+          background: "var(--paper)",
+          borderLeft: "1px solid rgba(20,18,12,0.1)",
+          boxShadow: "-20px 0 40px -20px rgba(20,18,12,0.25)",
+          zIndex: 51,
+          overflow: "auto",
+          padding: 18,
+          display: "grid",
+          gap: 18,
+          alignContent: "start"
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between"
+          }}
+        >
+          <h2
+            style={{
+              margin: 0,
+              fontFamily: '"Instrument Serif", serif',
+              fontSize: 28,
+              fontWeight: 400
+            }}
+          >
+            Tweaks
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="pill"
+            style={{ background: "#fff" }}
+          >
+            close
+          </button>
+        </div>
+        {children}
+      </aside>
+    </>
   );
 }
