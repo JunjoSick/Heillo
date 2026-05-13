@@ -17,6 +17,14 @@ export const defaultSettings: GameSettings = {
   lengthMismatchCost: 1.0,
   specialFallbackCost: 2.5,
 
+  swapBaseCost: 1.5,
+  swapVowelLiquidCost: 1.25,
+  swapVowelSemivowelCost: 1.25,
+  swapVowelNasalCost: 1.5,
+  swapVowelObstruentCost: 2.0,
+  swapSameBroadClassCost: 1.5,
+  swapSpecialPenalty: 0.5,
+
   maxCompoundStreak: 2,
   allowHomophoneMoves: true
 };

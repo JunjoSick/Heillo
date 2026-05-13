@@ -9,11 +9,16 @@ import {
   describeClusterChange
 } from "@/lib/phonetics/clusterRespelling";
 import {
+  COMPLEX_ONSET_TRANSITIONS,
+  describeComplexOnsetChange
+} from "@/lib/phonetics/complexOnsetTransitions";
+import {
   getDeletionCost,
   getInsertionCost
 } from "@/lib/phonetics/insertionDeletionCosts";
 import { getLengthFeature } from "@/lib/phonetics/geminates";
 import { getSubstitutionCost } from "@/lib/phonetics/substitutionCost";
+import { getSwapCost } from "@/lib/phonetics/swapCosts";
 
 export interface WeightedEditDistanceResult {
   cost: number;
@@ -80,6 +85,20 @@ function describeDeletion(token: PhonemeToken, cost: number): MoveChange {
     from: token,
     cost,
     description: `delete ${token}`
+  };
+}
+
+function describeSwap(
+  fromPair: [PhonemeToken, PhonemeToken],
+  toPair: [PhonemeToken, PhonemeToken],
+  cost: number
+): MoveChange {
+  return {
+    type: "swap",
+    from: fromPair,
+    to: toPair,
+    cost,
+    description: `swap ${fromPair.join(" ")} -> ${toPair.join(" ")}`
   };
 }
 
@@ -220,17 +239,83 @@ export function weightedEditDistance(
           );
         }
       }
-    }
 
-    if (
-      maxCost !== undefined &&
-      Math.min(...grid[i].map((cell) => cell.cost)) > maxCost
-    ) {
-      return {
-        cost: Infinity,
-        changes: [],
-        alignment: null
-      };
+      for (const transition of COMPLEX_ONSET_TRANSITIONS) {
+        if (
+          slicesMatch(from, i, transition.from) &&
+          slicesMatch(to, j, transition.to)
+        ) {
+          addTransition(
+            grid,
+            i,
+            j,
+            i + transition.from.length,
+            j + transition.to.length,
+            cell,
+            {
+              from: transition.from,
+              to: transition.to,
+              cost: transition.cost,
+              type: "onset-change"
+            },
+            describeComplexOnsetChange(transition.from, transition.to, transition.cost),
+            maxCost
+          );
+        }
+
+        if (
+          slicesMatch(from, i, transition.to) &&
+          slicesMatch(to, j, transition.from)
+        ) {
+          addTransition(
+            grid,
+            i,
+            j,
+            i + transition.to.length,
+            j + transition.from.length,
+            cell,
+            {
+              from: transition.to,
+              to: transition.from,
+              cost: transition.cost,
+              type: "onset-change"
+            },
+            describeComplexOnsetChange(transition.to, transition.from, transition.cost),
+            maxCost
+          );
+        }
+      }
+
+      if (
+        i + 1 < from.length &&
+        j + 1 < to.length &&
+        from[i] === to[j + 1] &&
+        from[i + 1] === to[j]
+      ) {
+        const cost = getSwapCost(from[i], from[i + 1], settings);
+
+        if (cost !== null) {
+          const fromPair: [PhonemeToken, PhonemeToken] = [from[i], from[i + 1]];
+          const toPair: [PhonemeToken, PhonemeToken] = [to[j], to[j + 1]];
+
+          addTransition(
+            grid,
+            i,
+            j,
+            i + 2,
+            j + 2,
+            cell,
+            {
+              from: fromPair,
+              to: toPair,
+              cost,
+              type: "swap"
+            },
+            describeSwap(fromPair, toPair, cost),
+            maxCost
+          );
+        }
+      }
     }
   }
 

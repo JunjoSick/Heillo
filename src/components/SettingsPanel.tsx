@@ -21,7 +21,29 @@ const numericSettings: Array<{
   { key: "insertSemivowelCost", label: "insertSemivowelCost", step: 0.5, min: 0 },
   { key: "insertConsonantCost", label: "insertConsonantCost", step: 0.5, min: 0 },
   { key: "lengthMismatchCost", label: "lengthMismatchCost", step: 0.5, min: 0 },
-  { key: "specialFallbackCost", label: "specialFallbackCost", step: 0.5, min: 0 }
+  { key: "specialFallbackCost", label: "specialFallbackCost", step: 0.5, min: 0 },
+  { key: "swapBaseCost", label: "swapBaseCost", step: 0.25, min: 0 },
+  { key: "swapVowelLiquidCost", label: "swapVowelLiquidCost", step: 0.25, min: 0 },
+  {
+    key: "swapVowelSemivowelCost",
+    label: "swapVowelSemivowelCost",
+    step: 0.25,
+    min: 0
+  },
+  { key: "swapVowelNasalCost", label: "swapVowelNasalCost", step: 0.25, min: 0 },
+  {
+    key: "swapVowelObstruentCost",
+    label: "swapVowelObstruentCost",
+    step: 0.25,
+    min: 0
+  },
+  {
+    key: "swapSameBroadClassCost",
+    label: "swapSameBroadClassCost",
+    step: 0.25,
+    min: 0
+  },
+  { key: "swapSpecialPenalty", label: "swapSpecialPenalty", step: 0.25, min: 0 }
 ];
 
 export function SettingsPanel({ settings, onChange }: SettingsPanelProps) {
