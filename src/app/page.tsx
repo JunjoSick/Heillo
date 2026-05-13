@@ -389,6 +389,8 @@ export default function Home() {
                     isStart={isStart}
                     index={i}
                     latest={i === pathWithOps.length - 1 && !preview}
+                    phonemes={entry.word.phonemes}
+                    visualChanges={entry.visualChanges}
                   />
                   {isStart ? <StartCaption /> : null}
                 </div>
@@ -415,6 +417,8 @@ export default function Home() {
                   isStart={false}
                   index={path.length}
                   latest
+                  phonemes={makePhoneticWord(preview.word).phonemes}
+                  visualChanges={previewVisualState.changes}
                 />
                 <PreviewCaption
                   op={preview.op}
