@@ -32,6 +32,7 @@ import {
 } from "@/lib/phonetics";
 import { appendMove, canAcceptMove } from "@/lib/path/pathRules";
 import { defaultSettings } from "@/lib/settings/defaultSettings";
+import { sanitizeWordInput } from "@/lib/text/sanitizeWordInput";
 import type { GameSettings, MoveValidation, PathEntry } from "@/lib/types";
 
 const DEFAULT_START_WORD = "gioco";
@@ -75,6 +76,15 @@ export default function Home() {
           error instanceof Error ? error.message : "Dictionary load failed."
         );
       });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (flashTimerRef.current !== null) {
+        window.clearTimeout(flashTimerRef.current);
+        flashTimerRef.current = null;
+      }
+    };
   }, []);
 
   const dictionaryContext = useMemo(
@@ -228,21 +238,27 @@ export default function Home() {
     flashMessage(`${word.trim()} added`);
   }
 
-  // Suggestions: cheap to compute against the current word, recomputed only when the
-  // current word or dictionary actually changes.
+  // Suggestions scan the dictionary; defer the inputs so settings tweaks or
+  // an accept don't stall the urgent render while the scan runs.
+  const deferredCurrentEntry = useDeferredValue(currentEntry);
+  const deferredDictionaryContext = useDeferredValue(dictionaryContext);
+  const deferredSettings = useDeferredValue(settings);
   const dockSuggestions = useMemo(() => {
-    if (!currentEntry || dictionaryContext.allWords.length === 0) {
+    if (
+      !deferredCurrentEntry ||
+      deferredDictionaryContext.allWords.length === 0
+    ) {
       return [] as string[];
     }
     return suggestNextWords(
-      currentEntry.word.raw,
-      dictionaryContext.allWords,
-      settings,
-      dictionaryContext
+      deferredCurrentEntry.word.raw,
+      deferredDictionaryContext.allWords,
+      deferredSettings,
+      deferredDictionaryContext
     )
       .slice(0, 3)
       .map((s) => s.word);
-  }, [currentEntry, dictionaryContext, settings]);
+  }, [deferredCurrentEntry, deferredDictionaryContext, deferredSettings]);
 
   const buttonLabel = preview ? (canAccept ? "accept" : "verify") : "verify";
 
@@ -337,7 +353,11 @@ export default function Home() {
                   op={preview.op}
                   canAccept={canAccept}
                   acceptanceMessage={
-                    !canAccept ? acceptance?.message ?? null : null
+                    !canAccept &&
+                    deferredPreview &&
+                    deferredPreview.word === preview.word
+                      ? acceptance?.message ?? null
+                      : null
                   }
                 />
               </div>
@@ -510,9 +530,7 @@ function StartWordControl({
         <input
           className="h-10 w-full min-w-0 rounded border border-moss/25 bg-white px-3 text-sm"
           onChange={(event) =>
-            setDraft(
-              event.target.value.replace(/[^a-zA-Zàèéìòù'\-]/g, "").toLowerCase()
-            )
+            setDraft(sanitizeWordInput(event.target.value).toLowerCase())
           }
           placeholder="gioco"
           value={draft}

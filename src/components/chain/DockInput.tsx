@@ -1,6 +1,7 @@
 "use client";
 
 import type { CSSProperties, KeyboardEvent } from "react";
+import { sanitizeWordInput } from "@/lib/text/sanitizeWordInput";
 
 interface DockInputProps {
   value: string;
@@ -97,9 +98,7 @@ export function DockInput({
         <label style={{ position: "relative", display: "block" }}>
           <input
             value={value}
-            onChange={(e) =>
-              onChange(e.target.value.replace(/[^a-zA-Zàèéìòù'\-]/g, ""))
-            }
+            onChange={(e) => onChange(sanitizeWordInput(e.target.value))}
             onKeyDown={handleKey}
             placeholder={placeholder}
             spellCheck={false}

@@ -145,4 +145,14 @@ describe("toIndicesAffected", () => {
     const op = classifyChain("glave", "snave");
     expect(toIndicesAffected(op, 5)).toEqual([0, 1]);
   });
+
+  it("returns an empty list for noop ops", () => {
+    expect(toIndicesAffected({ type: "noop" }, 5)).toEqual([]);
+  });
+
+  it("returns an empty list for invalid ops", () => {
+    expect(
+      toIndicesAffected({ type: "invalid", reason: "missing word" }, 5)
+    ).toEqual([]);
+  });
 });

@@ -1,10 +1,14 @@
-import { useId, type CSSProperties, type ReactNode } from "react";
+import { useId as useReactId, type CSSProperties, type ReactNode } from "react";
 import type { ChainOp } from "./diff";
 
-const HEIGHT = 96;
+// React's useId returns ids containing ":", valid as HTML ids but quirky inside
+// url(#...) references. Strip them so SVG markerEnd refs stay spec-clean.
+function useArrowId() {
+  return `arr-${useReactId().replace(/:/g, "")}`;
+}
 
 export function Bridge({ op }: { op: ChainOp | null }) {
-  if (!op || op.type === "noop" || op.type === "invalid") return <BridgeNoop />;
+  if (!op) return null;
   switch (op.type) {
     case "substitution":
       return <BridgeSubstitution op={op} />;
@@ -22,8 +26,10 @@ export function Bridge({ op }: { op: ChainOp | null }) {
       return <BridgeCluster op={op} />;
     case "onset-change":
       return <BridgeOnset op={op} />;
+    case "noop":
+    case "invalid":
     default:
-      return <BridgeNoop />;
+      return null;
   }
 }
 
@@ -46,14 +52,14 @@ function BridgeShell({
         alignItems: "center",
         columnGap: 12,
         padding: "8px 0",
-        minHeight: HEIGHT
+        minHeight: 96
       }}
     >
       <div style={{ display: "flex", justifyContent: "center" }}>
         <div
           style={{
             width: 2,
-            height: HEIGHT - 12,
+            height: 84,
             background: `linear-gradient(${tint}55, ${tint} 50%, ${tint}55)`,
             borderRadius: 2
           }}
@@ -89,24 +95,6 @@ function BridgeShell({
   );
 }
 
-function BridgeNoop() {
-  return (
-    <div
-      style={{
-        height: 40,
-        display: "grid",
-        gridTemplateColumns: "36px 1fr 130px",
-        alignItems: "center",
-        columnGap: 12
-      }}
-    >
-      <div style={{ display: "flex", justifyContent: "center" }}>
-        <div style={{ width: 2, height: 24, background: "var(--rule-line)" }} />
-      </div>
-    </div>
-  );
-}
-
 const plusBadge = (color: string): CSSProperties => ({
   position: "absolute",
   top: -8,
@@ -131,7 +119,7 @@ function BridgeSubstitution({
 }: {
   op: Extract<ChainOp, { type: "substitution" }>;
 }) {
-  const arrowId = useId();
+  const arrowId = useArrowId();
   return (
     <BridgeShell
       tint="var(--sub)"
@@ -408,7 +396,7 @@ function BridgeDeletion({
 
 /* ── 4. SWAP ───────────────────────────────────────────────────── */
 function BridgeSwap({ op }: { op: Extract<ChainOp, { type: "swap" }> }) {
-  const arrowId = useId();
+  const arrowId = useArrowId();
   const a = op.from[0] || "·";
   const b = op.from[1] || "·";
   return (
@@ -535,7 +523,7 @@ function BridgeLengthening({
 }: {
   op: Extract<ChainOp, { type: "lengthening" }>;
 }) {
-  const arrowId = useId();
+  const arrowId = useArrowId();
   return (
     <BridgeShell
       tint="var(--len)"
@@ -642,7 +630,7 @@ function BridgeShortening({
 }: {
   op: Extract<ChainOp, { type: "shortening" }>;
 }) {
-  const arrowId = useId();
+  const arrowId = useArrowId();
   return (
     <BridgeShell
       tint="var(--shr)"
@@ -743,7 +731,7 @@ function BridgeCluster({
 }: {
   op: Extract<ChainOp, { type: "cluster-change" }>;
 }) {
-  const arrowId = useId();
+  const arrowId = useArrowId();
   return (
     <BridgeShell
       tint="var(--clu)"
