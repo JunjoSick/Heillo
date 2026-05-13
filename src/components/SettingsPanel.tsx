@@ -1,5 +1,7 @@
 "use client";
 
+import { Menu, X } from "lucide-react";
+import { useState } from "react";
 import type { GameSettings } from "@/lib/types";
 
 interface SettingsPanelProps {
@@ -47,44 +49,70 @@ const numericSettings: Array<{
 ];
 
 export function SettingsPanel({ settings, onChange }: SettingsPanelProps) {
+  const [open, setOpen] = useState(false);
+
   return (
     <section className="rounded border border-moss/15 bg-white p-4 shadow-sm">
-      <h2 className="text-base font-semibold text-ink">Settings</h2>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        {numericSettings.map((setting) => (
-          <label className="grid gap-1.5 text-sm font-semibold text-ink" key={setting.key}>
-            {setting.label}
+      <button
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-3 text-left"
+        onClick={() => setOpen((current) => !current)}
+        title={open ? "Close settings" : "Open settings"}
+        type="button"
+      >
+        <span>
+          <span className="text-base font-semibold text-ink">Settings</span>
+          <span className="mt-1 block text-xs text-moss">
+            valid &lt;= {settings.validMax} / borderline &lt;= {settings.borderlineMax}
+          </span>
+        </span>
+        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded border border-moss/25 bg-white text-ink">
+          {open ? <X aria-hidden size={18} /> : <Menu aria-hidden size={18} />}
+        </span>
+      </button>
+
+      {open ? (
+        <div className="mt-4 max-h-[70vh] overflow-y-auto pr-1">
+          <div className="grid gap-3">
+            {numericSettings.map((setting) => (
+              <label
+                className="grid min-w-0 gap-1.5 text-sm font-semibold text-ink"
+                key={setting.key}
+              >
+                <span className="break-words">{setting.label}</span>
+                <input
+                  className="h-10 w-full min-w-0 rounded border border-moss/25 bg-white px-3 text-sm"
+                  min={setting.min}
+                  onChange={(event) =>
+                    onChange({
+                      ...settings,
+                      [setting.key]: Number(event.target.value)
+                    })
+                  }
+                  step={setting.step}
+                  type="number"
+                  value={settings[setting.key] as number}
+                />
+              </label>
+            ))}
+          </div>
+
+          <label className="mt-4 flex items-center gap-2 text-sm font-semibold text-ink">
             <input
-              className="h-10 rounded border border-moss/25 bg-white px-3 text-sm"
-              min={setting.min}
+              checked={settings.allowHomophoneMoves}
+              className="h-4 w-4"
               onChange={(event) =>
                 onChange({
                   ...settings,
-                  [setting.key]: Number(event.target.value)
+                  allowHomophoneMoves: event.target.checked
                 })
               }
-              step={setting.step}
-              type="number"
-              value={settings[setting.key] as number}
+              type="checkbox"
             />
+            allowHomophoneMoves
           </label>
-        ))}
-      </div>
-
-      <label className="mt-4 flex items-center gap-2 text-sm font-semibold text-ink">
-        <input
-          checked={settings.allowHomophoneMoves}
-          className="h-4 w-4"
-          onChange={(event) =>
-            onChange({
-              ...settings,
-              allowHomophoneMoves: event.target.checked
-            })
-          }
-          type="checkbox"
-        />
-        allowHomophoneMoves
-      </label>
+        </div>
+      ) : null}
     </section>
   );
 }
