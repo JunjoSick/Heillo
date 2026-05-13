@@ -36,4 +36,24 @@ describe("suggestNextWords", () => {
       "schema"
     );
   });
+
+  it("finds onset-change and swap suggestions when present", () => {
+    const onsetSuggestions = suggestNextWords("gioco", ["fioco"], defaultSettings, {
+      dictionaryWords: ["gioco", "fioco"],
+      customWords: []
+    });
+    const fioco = onsetSuggestions.find((suggestion) => suggestion.word === "fioco");
+
+    expect(fioco).toBeDefined();
+    expect(fioco?.validation.changes[0].type).toBe("onset-change");
+
+    const swapSuggestions = suggestNextWords("tarma", ["trama"], defaultSettings, {
+      dictionaryWords: ["tarma", "trama"],
+      customWords: []
+    });
+    const trama = swapSuggestions.find((suggestion) => suggestion.word === "trama");
+
+    expect(trama).toBeDefined();
+    expect(trama?.validation.changes[0].type).toBe("swap");
+  });
 });

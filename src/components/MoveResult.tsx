@@ -1,7 +1,9 @@
 import { Check, Plus, X } from "lucide-react";
+import { ChangeTiles } from "@/components/ChangeTiles";
 import { DebugAlignment } from "@/components/DebugAlignment";
 import { PhonemeView } from "@/components/PhonemeView";
-import type { MoveValidation, PathAcceptance } from "@/lib/types";
+import { RuleBadge } from "@/components/RuleBadge";
+import type { MoveClass, MoveValidation, PathAcceptance } from "@/lib/types";
 
 interface MoveResultProps {
   validation: MoveValidation | null;
@@ -10,11 +12,11 @@ interface MoveResultProps {
   onAcceptWord: () => void;
 }
 
-const classStyle = {
-  smooth: "bg-leaf/15 text-leaf border-leaf/25",
-  valid: "bg-gold/20 text-ink border-gold/30",
-  borderline: "bg-clay/15 text-clay border-clay/25",
-  invalid: "bg-clay text-white border-clay"
+const classStyle: Record<MoveClass, string> = {
+  smooth: "bg-leaf text-white border-leaf",
+  valid: "bg-sky-600 text-white border-sky-600",
+  borderline: "bg-orange-500 text-white border-orange-500",
+  invalid: "bg-red-600 text-white border-red-600"
 };
 
 export function MoveResult({
@@ -36,62 +38,83 @@ export function MoveResult({
 
   return (
     <section className="rounded border border-moss/15 bg-white p-4 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-ink">Candidate Result</h2>
-          <p className="mt-1 text-sm text-moss">{validation.explanation}</p>
+          <p className="mt-1 text-sm text-moss">
+            {validation.from.raw} to {validation.to.raw}
+          </p>
         </div>
         <span
-          className={`rounded border px-3 py-1 text-sm font-semibold ${classStyle[validation.class]}`}
+          className={`rounded-full border px-3 py-1 text-sm font-bold uppercase tracking-normal ${classStyle[validation.class]}`}
         >
-          {validation.class}
+          {validation.class} / cost {formatCost(validation.cost)}
         </span>
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <div className="grid gap-2">
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <div className="rounded-lg border border-moss/10 bg-paper p-3">
           <div className="text-sm font-semibold text-moss">
-            {validation.to.raw} phonemes
+            {validation.from.raw}
           </div>
-          <PhonemeView phonemes={validation.to.phonemes} />
+          <div className="mt-2">
+            <PhonemeView phonemes={validation.from.phonemes} />
+          </div>
         </div>
-        <div className="grid gap-1 text-sm">
-          <div>
-            <span className="font-semibold">Cost:</span> {validation.cost}
-          </div>
-          <div>
-            <span className="font-semibold">Compound:</span>{" "}
-            {validation.isCompound ? "yes" : "no"}
-          </div>
-          <div>
-            <span className="font-semibold">Dictionary status:</span>{" "}
-            {validation.lexical.source}
+        <div className="rounded-lg border border-moss/10 bg-paper p-3">
+          <div className="text-sm font-semibold text-moss">{validation.to.raw}</div>
+          <div className="mt-2">
+            <PhonemeView phonemes={validation.to.phonemes} />
           </div>
         </div>
       </div>
 
+      <div className="mt-4 flex flex-wrap gap-2">
+        {validation.homophoneMove ? <RuleBadge type="homophone" /> : null}
+        {validation.changes.length === 0 && !validation.homophoneMove ? (
+          <RuleBadge type="match" />
+        ) : null}
+        {validation.changes.map((change, index) => (
+          <RuleBadge change={change} key={`${change.description}-${index}`} />
+        ))}
+      </div>
+
       <div className="mt-4">
-        <h3 className="text-sm font-semibold text-ink">Changes</h3>
         {validation.changes.length === 0 ? (
-          <p className="mt-1 text-sm text-moss">No phonetic change.</p>
+          <div className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700">
+            {validation.homophoneMove
+              ? "Different spelling, same game phonetics."
+              : "No phonetic change."}
+          </div>
         ) : (
-          <ul className="mt-2 grid gap-1.5 text-sm">
+          <div className="flex flex-wrap gap-2">
             {validation.changes.map((change, index) => (
-              <li
-                className="rounded border border-moss/10 bg-paper px-3 py-2"
-                key={`${change.description}-${index}`}
-              >
-                {change.description}, cost {change.cost}
-              </li>
+              <ChangeTiles change={change} key={`${change.description}-${index}`} />
             ))}
-          </ul>
+          </div>
         )}
       </div>
 
-      <div className="mt-4">
-        <h3 className="mb-2 text-sm font-semibold text-ink">Debug Alignment</h3>
-        <DebugAlignment alignment={validation.alignment} />
+      <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-moss">
+        <span className="rounded-full bg-mist px-2.5 py-1">
+          {validation.isCompound ? "compound" : "atomic"}
+        </span>
+        <span className="rounded-full bg-mist px-2.5 py-1">
+          {validation.meaningfulChangeCount} meaningful
+        </span>
+        <span className="rounded-full bg-mist px-2.5 py-1">
+          {validation.lexical.source}
+        </span>
       </div>
+
+      <details className="mt-4 border-t border-moss/10 pt-3">
+        <summary className="cursor-pointer text-sm font-semibold text-ink">
+          Debug alignment
+        </summary>
+        <div className="mt-3">
+          <DebugAlignment alignment={validation.alignment} />
+        </div>
+      </details>
 
       <div className="mt-4 flex flex-wrap gap-2">
         {acceptance?.accepted ? (
@@ -124,4 +147,8 @@ export function MoveResult({
       </div>
     </section>
   );
+}
+
+function formatCost(cost: number): string {
+  return Number.isFinite(cost) ? cost.toFixed(2) : "inf";
 }

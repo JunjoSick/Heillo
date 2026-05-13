@@ -4,10 +4,39 @@ export function OnboardingBox() {
       <h2 className="text-base font-semibold text-ink">
         This game judges words by sound, not spelling.
       </h2>
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
+      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         <Example
           result="smooth"
           rows={["gioco -> geco", "GD O K O", "GD E K O", "O -> E"]}
+        />
+        <Example
+          result="valid onset-change"
+          rows={[
+            "gioco -> fioco",
+            "gioco = GD O K O",
+            "fioco = F J O K O",
+            "GD -> F J",
+            "compact palatal onset becomes consonant plus glide"
+          ]}
+        />
+        <Example
+          result="valid swap"
+          rows={[
+            "tarma -> trama",
+            "tarma = T A R M A",
+            "trama = T R A M A",
+            "A R -> R A",
+            "adjacent phonemes trade places"
+          ]}
+        />
+        <Example
+          result="not a swap"
+          rows={[
+            "stagna -> stanga",
+            "stagna = S T A GN A",
+            "stanga = S T A N G A",
+            "GN is one token; N G is a sequence"
+          ]}
         />
         <Example
           result="borderline"

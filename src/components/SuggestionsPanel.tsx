@@ -1,4 +1,6 @@
 import { Search } from "lucide-react";
+import { ChangeTiles } from "@/components/ChangeTiles";
+import { RuleBadge } from "@/components/RuleBadge";
 import type { MoveClass, Suggestion } from "@/lib/types";
 
 interface SuggestionsPanelProps {
@@ -10,6 +12,13 @@ interface SuggestionsPanelProps {
 }
 
 const groups: MoveClass[] = ["smooth", "valid", "borderline"];
+
+const groupStyle: Record<MoveClass, string> = {
+  smooth: "border-leaf/30 bg-emerald-50",
+  valid: "border-sky-200 bg-sky-50",
+  borderline: "border-orange-200 bg-orange-50",
+  invalid: "border-red-200 bg-red-50"
+};
 
 export function SuggestionsPanel({
   suggestions,
@@ -54,27 +63,55 @@ export function SuggestionsPanel({
                 <ul className="mt-2 grid gap-2">
                   {groupSuggestions.map((suggestion) => (
                     <li
-                      className="flex flex-wrap items-center justify-between gap-2 rounded border border-moss/10 bg-paper px-3 py-2 text-sm"
+                      className={`grid gap-2 rounded-lg border px-3 py-2 text-sm ${groupStyle[group]}`}
                       key={suggestion.word}
                     >
-                      <div>
-                        <span className="font-semibold text-ink">{suggestion.word}</span>
-                        <span className="ml-2 text-moss">
-                          cost {suggestion.validation.cost}
-                        </span>
-                        <span className="ml-2 text-moss">
-                          {suggestion.validation.changes
-                            .map((change) => change.description)
-                            .join(", ")}
-                        </span>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <span className="text-lg font-bold text-ink">
+                            {suggestion.word}
+                          </span>
+                          <span className="ml-2 text-moss">
+                            {suggestion.validation.class} / cost{" "}
+                            {formatCost(suggestion.validation.cost)}
+                          </span>
+                        </div>
+                        <button
+                          className="h-8 rounded border border-moss/25 bg-white px-2 text-xs font-semibold text-ink"
+                          onClick={() => onUseSuggestion(suggestion.word)}
+                          type="button"
+                        >
+                          Check
+                        </button>
                       </div>
-                      <button
-                        className="h-8 rounded border border-moss/25 bg-white px-2 text-xs font-semibold text-ink"
-                        onClick={() => onUseSuggestion(suggestion.word)}
-                        type="button"
-                      >
-                        Check
-                      </button>
+
+                      <div className="flex flex-wrap gap-1.5">
+                        {suggestion.validation.homophoneMove ? (
+                          <RuleBadge type="homophone" />
+                        ) : null}
+                        {suggestion.validation.changes.length === 0 &&
+                        !suggestion.validation.homophoneMove ? (
+                          <RuleBadge type="match" />
+                        ) : null}
+                        {suggestion.validation.changes.map((change, index) => (
+                          <RuleBadge
+                            change={change}
+                            key={`${change.description}-${index}`}
+                          />
+                        ))}
+                      </div>
+
+                      {suggestion.validation.changes.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {suggestion.validation.changes.map((change, index) => (
+                            <ChangeTiles
+                              change={change}
+                              compact
+                              key={`${change.description}-${index}`}
+                            />
+                          ))}
+                        </div>
+                      ) : null}
                     </li>
                   ))}
                 </ul>
@@ -85,4 +122,8 @@ export function SuggestionsPanel({
       </div>
     </section>
   );
+}
+
+function formatCost(cost: number): string {
+  return Number.isFinite(cost) ? cost.toFixed(2) : "inf";
 }

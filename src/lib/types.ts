@@ -48,7 +48,9 @@ export type ChangeType =
   | "deletion"
   | "lengthening"
   | "shortening"
-  | "cluster-change";
+  | "cluster-change"
+  | "onset-change"
+  | "swap";
 
 export interface PhoneticWord {
   raw: string;
@@ -115,6 +117,14 @@ export interface GameSettings {
 
   lengthMismatchCost: number;
   specialFallbackCost: number;
+
+  swapBaseCost: number;
+  swapVowelLiquidCost: number;
+  swapVowelSemivowelCost: number;
+  swapVowelNasalCost: number;
+  swapVowelObstruentCost: number;
+  swapSameBroadClassCost: number;
+  swapSpecialPenalty: number;
 
   maxCompoundStreak: number;
   allowHomophoneMoves: boolean;
