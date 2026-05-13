@@ -20,6 +20,8 @@ export interface VisualChange {
   type: VisualRuleType;
   from: string[];
   to: string[];
+  fromIndices?: number[];
+  toIndices?: number[];
   cost?: number;
   description: string;
   source: VisualChangeSource;

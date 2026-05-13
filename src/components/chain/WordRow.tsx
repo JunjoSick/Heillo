@@ -1,7 +1,7 @@
 import { useMemo, type CSSProperties } from "react";
 import { Tile } from "./Tile";
 import { RulePill } from "./RulePill";
-import { ruleTint, toIndicesAffected, type ChainOp, type ChainRule } from "./diff";
+import { toIndicesAffected, type ChainOp } from "./diff";
 import { ruleTint as visualRuleTint } from "./bridge/bridgeUtils";
 import type { VisualChange, VisualRuleType } from "./visualOps";
 import type { PhonemeToken } from "@/lib/types";
@@ -29,8 +29,10 @@ export function WordRow({
   visualChanges
 }: WordRowProps) {
   const letters = word.split("");
-  const ruleType: ChainRule | null =
-    op && op.type !== "noop" && op.type !== "invalid" ? (op.type as ChainRule) : null;
+  const opRuleType: VisualRuleType | null =
+    op && op.type !== "noop" && op.type !== "invalid" ? op.type : null;
+  const visualRuleType = firstRowRuleType(visualChanges);
+  const ruleType = visualRuleType ?? opRuleType;
 
   const toHighlights = useMemo(() => {
     const set = new Set<number>();
@@ -38,17 +40,13 @@ export function WordRow({
     return set;
   }, [op, letters.length]);
 
-  // Phoneme tint resolution: a chip is tinted when its token appears in any
-  // visualChange.from / visualChange.to. We track _which_ rule type tinted
-  // each chip so a compound move colors each touched phoneme with its own rule.
+  // Phoneme tint resolution: WordRow renders the destination word, so only
+  // target-side indices/tokens are eligible for highlights.
   const phonemeTints = useMemo(() => {
     if (!phonemes || !visualChanges || visualChanges.length === 0) {
       return new Map<number, VisualRuleType>();
     }
-    // Build a multiset of tokens-to-rule, scanning right-to-left so we match
-    // the first occurrence in the word once and don't paint everything.
     const map = new Map<number, VisualRuleType>();
-    const usedFrom = new Set<number>();
     const usedTo = new Set<number>();
     for (const change of visualChanges) {
       if (change.type === "homophone") {
@@ -58,21 +56,20 @@ export function WordRow({
         }
         continue;
       }
+      if (change.toIndices) {
+        for (const idx of change.toIndices) {
+          if (idx >= 0 && idx < phonemes.length && !map.has(idx)) {
+            map.set(idx, change.type);
+          }
+        }
+        continue;
+      }
       for (const token of change.to) {
         const idx = phonemes.findIndex(
           (p, i) => !usedTo.has(i) && String(p) === token
         );
         if (idx >= 0) {
           usedTo.add(idx);
-          if (!map.has(idx)) map.set(idx, change.type);
-        }
-      }
-      for (const token of change.from) {
-        const idx = phonemes.findIndex(
-          (p, i) => !usedFrom.has(i) && String(p) === token
-        );
-        if (idx >= 0) {
-          usedFrom.add(idx);
           if (!map.has(idx)) map.set(idx, change.type);
         }
       }
@@ -93,7 +90,7 @@ export function WordRow({
               key={i}
               letter={ch}
               highlight={toHighlights.has(i)}
-              ruleType={ruleType}
+              ruleType={opRuleType}
             />
           ))}
         </div>
@@ -145,8 +142,19 @@ export function WordRow({
   );
 }
 
-function stepBadgeStyle(isStart: boolean, ruleType: ChainRule | null): CSSProperties {
-  const tint = ruleType ? ruleTint(ruleType) : null;
+function firstRowRuleType(
+  visualChanges: VisualChange[] | undefined
+): VisualRuleType | null {
+  return (
+    visualChanges?.find((change) => change.type !== "noop")?.type ?? null
+  );
+}
+
+function stepBadgeStyle(
+  isStart: boolean,
+  ruleType: VisualRuleType | null
+): CSSProperties {
+  const tint = ruleType ? visualRuleTint(ruleType) : null;
   return {
     fontFamily: 'var(--font-geist-mono), "Geist Mono", monospace',
     fontSize: 11,

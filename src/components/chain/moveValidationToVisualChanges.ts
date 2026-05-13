@@ -1,4 +1,9 @@
-import type { ChangeType, MoveChange, MoveValidation } from "@/lib/types";
+import type {
+  AlignmentStep,
+  ChangeType,
+  MoveChange,
+  MoveValidation
+} from "@/lib/types";
 import type { VisualChange, VisualRuleType } from "./visualOps";
 
 const CHANGE_TYPE_PASSTHROUGH = new Set<ChangeType>([
@@ -35,6 +40,44 @@ function moveChangeToVisualChange(change: MoveChange): VisualChange {
   };
 }
 
+function indicesFrom(start: number, length: number): number[] {
+  return Array.from({ length }, (_, offset) => start + offset);
+}
+
+function annotateWithAlignment(
+  visualChanges: VisualChange[],
+  alignment: AlignmentStep[] | null
+): VisualChange[] {
+  if (!alignment || visualChanges.length === 0) return visualChanges;
+
+  let fromCursor = 0;
+  let toCursor = 0;
+  let changeIndex = 0;
+  const annotated = [...visualChanges];
+
+  for (const step of alignment) {
+    const fromStart = fromCursor;
+    const toStart = toCursor;
+
+    fromCursor += step.from.length;
+    toCursor += step.to.length;
+
+    if (step.type === "match" || step.cost <= 0) continue;
+
+    const change = annotated[changeIndex];
+    if (!change) break;
+
+    annotated[changeIndex] = {
+      ...change,
+      fromIndices: indicesFrom(fromStart, step.from.length),
+      toIndices: indicesFrom(toStart, step.to.length)
+    };
+    changeIndex += 1;
+  }
+
+  return annotated;
+}
+
 export function moveValidationToVisualChanges(
   validation: MoveValidation
 ): VisualChange[] {
@@ -68,5 +111,8 @@ export function moveValidationToVisualChanges(
     ];
   }
 
-  return validation.changes.map(moveChangeToVisualChange);
+  return annotateWithAlignment(
+    validation.changes.map(moveChangeToVisualChange),
+    validation.alignment
+  );
 }

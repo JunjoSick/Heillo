@@ -100,9 +100,9 @@ export default function Home() {
     [dictionary, customWords]
   );
 
-  // Classify every chain transition once per path change. Accepted entries are
-  // driven by MoveValidation.changes (phonetic truth); only the rare fallback
-  // case (entry without a stored move) falls back to the spelling-level diff.
+  // Accepted entries are driven by MoveValidation.changes (phonetic truth).
+  // Only the rare fallback case (entry without a stored move) gets a
+  // spelling-level op for row highlights.
   const pathWithOps: PathEntryWithOp[] = useMemo(
     () =>
       path.map((entry, i) => {
@@ -117,7 +117,7 @@ export default function Home() {
         if (entry.move) {
           return {
             ...entry,
-            op: classifyChain(path[i - 1].word.raw, entry.word.raw),
+            op: null,
             visualSource: {
               kind: "validated-phonetic" as const,
               validation: entry.move
@@ -421,7 +421,11 @@ export default function Home() {
               >
                 <WordRow
                   word={preview.word}
-                  op={preview.op}
+                  op={
+                    previewVisualState.source === "tentative-spelling-preview"
+                      ? preview.op
+                      : null
+                  }
                   isStart={false}
                   index={path.length}
                   latest

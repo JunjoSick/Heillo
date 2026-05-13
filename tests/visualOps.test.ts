@@ -45,6 +45,30 @@ describe("moveValidationToVisualChanges", () => {
     expect(types).toContain("substitution");
   });
 
+  it("carries target phoneme indices for validated row highlights", () => {
+    const validation = validateMove("casa", "caso", defaultSettings);
+    const visual = moveValidationToVisualChanges(validation);
+
+    expect(visual[0]).toMatchObject({
+      type: "substitution",
+      from: ["A"],
+      to: ["O"],
+      fromIndices: [3],
+      toIndices: [3]
+    });
+  });
+
+  it("keeps gioco → fioco typed as a phonetic onset change", () => {
+    const validation = validateMove("gioco", "fioco", defaultSettings);
+    const visual = moveValidationToVisualChanges(validation);
+
+    expect(visual[0]).toMatchObject({
+      type: "onset-change",
+      source: "phonetic",
+      toIndices: [0, 1]
+    });
+  });
+
   it("returns an empty list for same-spelling no-ops", () => {
     const validation = validateMove("gioco", "gioco", defaultSettings);
     expect(moveValidationToVisualChanges(validation)).toEqual([]);
