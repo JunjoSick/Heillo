@@ -13,7 +13,13 @@ import { DockInput } from "@/components/chain/DockInput";
 import { Legend } from "@/components/chain/Legend";
 import { TopBar } from "@/components/chain/TopBar";
 import { WordRow } from "@/components/chain/WordRow";
+import { chainOpToVisualChanges } from "@/components/chain/chainOpToVisualChanges";
 import { classifyChain, type ChainOp } from "@/components/chain/diff";
+import { moveValidationToVisualChanges } from "@/components/chain/moveValidationToVisualChanges";
+import type {
+  VisualChange,
+  VisualOpSource
+} from "@/components/chain/visualOps";
 import { CustomWordsPanel } from "@/components/CustomWordsPanel";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import {
@@ -43,6 +49,8 @@ function makeInitialPath(startWord: string): PathEntry[] {
 
 interface PathEntryWithOp extends PathEntry {
   op: ChainOp | null;
+  visualSource: VisualOpSource;
+  visualChanges: VisualChange[];
 }
 
 export default function Home() {
@@ -92,14 +100,39 @@ export default function Home() {
     [dictionary, customWords]
   );
 
-  // Classify every chain transition once per path change.
+  // Classify every chain transition once per path change. Accepted entries are
+  // driven by MoveValidation.changes (phonetic truth); only the rare fallback
+  // case (entry without a stored move) falls back to the spelling-level diff.
   const pathWithOps: PathEntryWithOp[] = useMemo(
     () =>
-      path.map((entry, i) => ({
-        ...entry,
-        op:
-          i === 0 ? null : classifyChain(path[i - 1].word.raw, entry.word.raw)
-      })),
+      path.map((entry, i) => {
+        if (i === 0) {
+          return {
+            ...entry,
+            op: null,
+            visualSource: { kind: "start" as const },
+            visualChanges: []
+          };
+        }
+        if (entry.move) {
+          return {
+            ...entry,
+            op: classifyChain(path[i - 1].word.raw, entry.word.raw),
+            visualSource: {
+              kind: "validated-phonetic" as const,
+              validation: entry.move
+            },
+            visualChanges: moveValidationToVisualChanges(entry.move)
+          };
+        }
+        const op = classifyChain(path[i - 1].word.raw, entry.word.raw);
+        return {
+          ...entry,
+          op,
+          visualSource: { kind: "tentative-spelling-preview" as const, op },
+          visualChanges: chainOpToVisualChanges(op)
+        };
+      }),
     [path]
   );
 
@@ -151,6 +184,30 @@ export default function Home() {
       preview &&
       preview.word === deferredPreview.word
   );
+
+  // The preview row prefers validated-phonetic visuals once validation has
+  // caught up to the live draft, falling back to a spelling-preview otherwise.
+  const previewVisualState: {
+    changes: VisualChange[];
+    source: "validated-phonetic" | "tentative-spelling-preview";
+  } | null = useMemo(() => {
+    if (!preview) return null;
+    if (
+      validation &&
+      deferredPreview &&
+      preview.word === deferredPreview.word &&
+      casefoldTrim(validation.to.raw) === casefoldTrim(preview.word)
+    ) {
+      return {
+        changes: moveValidationToVisualChanges(validation),
+        source: "validated-phonetic"
+      };
+    }
+    return {
+      changes: chainOpToVisualChanges(preview.op),
+      source: "tentative-spelling-preview"
+    };
+  }, [preview, deferredPreview, validation]);
 
   // Auto-scroll to bottom when path grows or preview changes.
   useEffect(() => {
