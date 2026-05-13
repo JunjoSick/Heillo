@@ -9,7 +9,7 @@ import {
   useState
 } from "react";
 import { Bridge } from "@/components/chain/Bridge";
-import { DockInput } from "@/components/chain/DockInput";
+import { DockInput, type DockSuggestion } from "@/components/chain/DockInput";
 import { Legend } from "@/components/chain/Legend";
 import { TopBar } from "@/components/chain/TopBar";
 import { WordRow } from "@/components/chain/WordRow";
@@ -300,12 +300,12 @@ export default function Home() {
   const deferredCurrentEntry = useDeferredValue(currentEntry);
   const deferredDictionaryContext = useDeferredValue(dictionaryContext);
   const deferredSettings = useDeferredValue(settings);
-  const dockSuggestions = useMemo(() => {
+  const dockSuggestions: DockSuggestion[] = useMemo(() => {
     if (
       !deferredCurrentEntry ||
       deferredDictionaryContext.allWords.length === 0
     ) {
-      return [] as string[];
+      return [];
     }
     return suggestNextWords(
       deferredCurrentEntry.word.raw,
@@ -314,7 +314,12 @@ export default function Home() {
       deferredDictionaryContext
     )
       .slice(0, 3)
-      .map((s) => s.word);
+      .map((s) => ({
+        word: s.word,
+        visualChanges: moveValidationToVisualChanges(s.validation),
+        cost: s.validation.cost,
+        className: s.validation.class
+      }));
   }, [deferredCurrentEntry, deferredDictionaryContext, deferredSettings]);
 
   const buttonLabel = preview ? (canAccept ? "accept" : "verify") : "verify";
@@ -392,6 +397,9 @@ export default function Home() {
                     phonemes={entry.word.phonemes}
                     visualChanges={entry.visualChanges}
                   />
+                  {!isStart && entry.move ? (
+                    <DebugDisclosure move={entry.move} />
+                  ) : null}
                   {isStart ? <StartCaption /> : null}
                 </div>
               </Fragment>
@@ -615,6 +623,84 @@ function StartWordControl({
       </form>
     </section>
   );
+}
+
+function DebugDisclosure({ move }: { move: MoveValidation }) {
+  return (
+    <details
+      style={{
+        margin: "6px auto 0",
+        maxWidth: 560,
+        fontFamily: 'var(--font-geist-mono), "Geist Mono", monospace',
+        fontSize: 10,
+        color: "var(--moss)"
+      }}
+    >
+      <summary
+        style={{
+          cursor: "pointer",
+          textAlign: "center",
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          opacity: 0.6
+        }}
+      >
+        debug phonetics
+      </summary>
+      <div
+        style={{
+          marginTop: 6,
+          padding: "8px 10px",
+          borderRadius: 8,
+          background: "var(--paper-2)",
+          border: "1px solid rgba(20,18,12,0.08)",
+          color: "var(--ink)",
+          lineHeight: 1.5,
+          whiteSpace: "pre-wrap"
+        }}
+      >
+        <div>
+          <strong>from</strong> {move.from.raw} · {move.from.normalized} · [
+          {move.from.phonemes.join(" ")}]
+        </div>
+        <div>
+          <strong>to</strong> {move.to.raw} · {move.to.normalized} · [
+          {move.to.phonemes.join(" ")}]
+        </div>
+        <div>
+          <strong>class</strong> {move.class} · <strong>cost</strong>{" "}
+          {move.cost.toFixed(2)} · <strong>compound</strong>{" "}
+          {move.isCompound ? "yes" : "no"} · <strong>changes</strong>{" "}
+          {move.meaningfulChangeCount}
+        </div>
+        <div>
+          <strong>lexical</strong> {move.lexical.source} ·{" "}
+          <strong>acceptAsProgress</strong>{" "}
+          {move.acceptAsProgress ? "yes" : "no"} ·{" "}
+          <strong>homophone</strong> {move.homophoneMove ? "yes" : "no"}
+        </div>
+        {move.changes.length > 0 ? (
+          <div style={{ marginTop: 4 }}>
+            <strong>changes</strong>{" "}
+            {move.changes
+              .map(
+                (c) =>
+                  `${c.type}[${stringifyTokens(c.from)}→${stringifyTokens(c.to)} @${c.cost}]`
+              )
+              .join("  ")}
+          </div>
+        ) : null}
+      </div>
+    </details>
+  );
+}
+
+function stringifyTokens(
+  v: MoveValidation["changes"][number]["from"] | MoveValidation["changes"][number]["to"]
+): string {
+  if (v === undefined) return "∅";
+  if (Array.isArray(v)) return v.join("");
+  return String(v);
 }
 
 function SidePanel({

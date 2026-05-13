@@ -1,7 +1,16 @@
 "use client";
 
 import type { CSSProperties, KeyboardEvent } from "react";
+import { MiniChange } from "./bridge/MiniChange";
+import type { VisualChange } from "./visualOps";
 import { sanitizeWordInput } from "@/lib/text/sanitizeWordInput";
+
+export interface DockSuggestion {
+  word: string;
+  visualChanges: VisualChange[];
+  cost: number;
+  className: string;
+}
 
 interface DockInputProps {
   value: string;
@@ -13,7 +22,7 @@ interface DockInputProps {
   onReset: () => void;
   stepNumber: number;
   flash?: string | null;
-  suggestions?: string[];
+  suggestions?: DockSuggestion[];
   onPickSuggestion?: (word: string) => void;
   disabled?: boolean;
   placeholder?: string;
@@ -192,13 +201,19 @@ export function DockInput({
                 justifyContent: "center"
               }}
             >
-              {suggestions.map((s) => (
+              {suggestions.map((suggestion) => (
                 <button
-                  key={s}
+                  key={suggestion.word}
                   type="button"
-                  onClick={() => onPickSuggestion(s)}
+                  onClick={() => onPickSuggestion(suggestion.word)}
+                  title={`${suggestion.className} · cost ${suggestion.cost.toFixed(
+                    2
+                  )}`}
                   style={{
-                    padding: "2px 8px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "2px 4px 2px 8px",
                     borderRadius: 999,
                     border: "1px solid rgba(20,18,12,0.15)",
                     background: "#fff",
@@ -209,7 +224,10 @@ export function DockInput({
                     letterSpacing: "0.04em"
                   }}
                 >
-                  {s}
+                  <span>{suggestion.word}</span>
+                  {suggestion.visualChanges[0] ? (
+                    <MiniChange change={suggestion.visualChanges[0]} />
+                  ) : null}
                 </button>
               ))}
             </span>
