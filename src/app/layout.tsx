@@ -1,9 +1,31 @@
 import type { Metadata } from "next";
+import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 
+const geist = Geist({
+  subsets: ["latin"],
+  variable: "--font-geist",
+  display: "swap"
+});
+
+const geistMono = Geist_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-geist-mono",
+  display: "swap"
+});
+
+const instrumentSerif = Instrument_Serif({
+  subsets: ["latin"],
+  weight: "400",
+  style: ["normal", "italic"],
+  variable: "--font-instrument-serif",
+  display: "swap"
+});
+
 export const metadata: Metadata = {
-  title: "Heillo",
-  description: "A deterministic Italian phonetic word-transformation playtest tool."
+  title: "Heillo — chain of words",
+  description: "A chain of Italian sounds."
 };
 
 export default function RootLayout({
@@ -12,7 +34,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html
+      lang="en"
+      className={`${geist.variable} ${geistMono.variable} ${instrumentSerif.variable}`}
+    >
       <body>{children}</body>
     </html>
   );
