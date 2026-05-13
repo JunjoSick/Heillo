@@ -23,7 +23,7 @@ export function TopBar({ onMenuClick, menuOpen }: TopBarProps) {
         <h1
           style={{
             margin: 0,
-            fontFamily: '"Instrument Serif", serif',
+            fontFamily: 'var(--font-instrument-serif), "Instrument Serif", serif',
             fontSize: 44,
             lineHeight: 0.9,
             letterSpacing: -0.01,
@@ -35,7 +35,7 @@ export function TopBar({ onMenuClick, menuOpen }: TopBarProps) {
         </h1>
         <span
           style={{
-            fontFamily: '"Geist Mono", monospace',
+            fontFamily: 'var(--font-geist-mono), "Geist Mono", monospace',
             fontSize: 11,
             color: "var(--moss)",
             letterSpacing: "0.06em",

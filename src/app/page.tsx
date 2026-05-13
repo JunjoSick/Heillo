@@ -1,6 +1,13 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react";
 import { Bridge } from "@/components/chain/Bridge";
 import { DockInput } from "@/components/chain/DockInput";
 import { Legend } from "@/components/chain/Legend";
@@ -25,23 +32,24 @@ import {
 } from "@/lib/phonetics";
 import { appendMove, canAcceptMove } from "@/lib/path/pathRules";
 import { defaultSettings } from "@/lib/settings/defaultSettings";
-import type {
-  GameSettings,
-  MoveValidation,
-  PathEntry,
-  Suggestion
-} from "@/lib/types";
+import type { GameSettings, MoveValidation, PathEntry } from "@/lib/types";
 
-const START_WORD = "gioco";
+const DEFAULT_START_WORD = "gioco";
 
-function makeInitialPath(): PathEntry[] {
-  return [{ word: makePhoneticWord(START_WORD) }];
+function makeInitialPath(startWord: string): PathEntry[] {
+  return [{ word: makePhoneticWord(startWord) }];
+}
+
+interface PathEntryWithOp extends PathEntry {
+  op: ChainOp | null;
 }
 
 export default function Home() {
-  const [path, setPath] = useState<PathEntry[]>(() => makeInitialPath());
+  const [startWord, setStartWord] = useState(DEFAULT_START_WORD);
+  const [path, setPath] = useState<PathEntry[]>(() =>
+    makeInitialPath(DEFAULT_START_WORD)
+  );
   const [draft, setDraft] = useState("");
-  const [validation, setValidation] = useState<MoveValidation | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -49,11 +57,11 @@ export default function Home() {
   const [dictionaryError, setDictionaryError] = useState<string | null>(null);
   const [customWords, setCustomWords] = useState<string[]>([]);
   const [settings, setSettings] = useState<GameSettings>(defaultSettings);
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [manualWord, setManualWord] = useState("");
   const [exportText, setExportText] = useState("");
 
   const chainScrollRef = useRef<HTMLElement>(null);
+  const flashTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     setCustomWords(loadCustomWords());
@@ -74,34 +82,45 @@ export default function Home() {
     [dictionary, customWords]
   );
 
+  // Classify every chain transition once per path change.
+  const pathWithOps: PathEntryWithOp[] = useMemo(
+    () =>
+      path.map((entry, i) => ({
+        ...entry,
+        op:
+          i === 0 ? null : classifyChain(path[i - 1].word.raw, entry.word.raw)
+      })),
+    [path]
+  );
+
   const currentEntry = path[path.length - 1];
   const currentWord = currentEntry?.word.raw ?? "";
 
-  // Live preview op from the char-level diff (visual classification only).
+  // Live preview — instant, runs on every keystroke (cheap).
   const preview: { word: string; op: ChainOp } | null = useMemo(() => {
     const w = draft.trim().toLowerCase();
     if (!w || w === currentWord.toLowerCase()) return null;
     return { word: w, op: classifyChain(currentWord, w) };
   }, [draft, currentWord]);
 
-  // Compute validation in response to draft changes so we can decide acceptability.
-  useEffect(() => {
-    if (!currentEntry || !preview) {
-      setValidation(null);
-      return;
+  // Validation is expensive; defer it so typing stays responsive.
+  const deferredPreview = useDeferredValue(preview);
+
+  const validation: MoveValidation | null = useMemo(() => {
+    if (!currentEntry || !deferredPreview) return null;
+    if (
+      deferredPreview.op.type === "invalid" ||
+      deferredPreview.op.type === "noop"
+    ) {
+      return null;
     }
-    if (preview.op.type === "invalid" || preview.op.type === "noop") {
-      setValidation(null);
-      return;
-    }
-    const next = validateMove(
+    return validateMove(
       currentEntry.word.raw,
-      preview.word,
+      deferredPreview.word,
       settings,
       dictionaryContext
     );
-    setValidation(next);
-  }, [preview, currentEntry, settings, dictionaryContext]);
+  }, [deferredPreview, currentEntry, settings, dictionaryContext]);
 
   const acceptedMoves = useMemo(
     () => path.map((e) => e.move).filter(Boolean) as MoveValidation[],
@@ -116,8 +135,11 @@ export default function Home() {
   const canAccept = Boolean(
     validation &&
       acceptance?.accepted &&
+      deferredPreview &&
+      casefoldTrim(deferredPreview.word) === casefoldTrim(validation.to.raw) &&
+      // Don't claim acceptance for a stale deferred value while the user is still typing.
       preview &&
-      casefoldTrim(preview.word) === casefoldTrim(validation.to.raw)
+      preview.word === deferredPreview.word
   );
 
   // Auto-scroll to bottom when path grows or preview changes.
@@ -132,7 +154,13 @@ export default function Home() {
 
   function flashMessage(message: string) {
     setFlash(message);
-    window.setTimeout(() => setFlash((cur) => (cur === message ? null : cur)), 1800);
+    if (flashTimerRef.current !== null) {
+      window.clearTimeout(flashTimerRef.current);
+    }
+    flashTimerRef.current = window.setTimeout(() => {
+      setFlash(null);
+      flashTimerRef.current = null;
+    }, 1800);
   }
 
   function handleAccept() {
@@ -142,32 +170,20 @@ export default function Home() {
       flashMessage(unsupported);
       return;
     }
-    if (!validation) {
-      const next = validateMove(
-        currentEntry.word.raw,
-        preview.word,
-        settings,
-        dictionaryContext
-      );
-      setValidation(next);
-      const acc = canAcceptMove(acceptedMoves, next, settings);
-      if (!acc.accepted) {
-        flashMessage(acc.message);
-        return;
-      }
-      setPath((p) => appendMove(p, next));
-      setDraft("");
-      setValidation(null);
-      flashMessage(`accepted: ${preview.word}`);
+    // Always re-run validation against the live draft so we don't accept off a stale deferred state.
+    const next = validateMove(
+      currentEntry.word.raw,
+      preview.word,
+      settings,
+      dictionaryContext
+    );
+    const acc = canAcceptMove(acceptedMoves, next, settings);
+    if (!acc.accepted) {
+      flashMessage(acc.message);
       return;
     }
-    if (!acceptance?.accepted) {
-      flashMessage(acceptance?.message ?? "invalid move");
-      return;
-    }
-    setPath((p) => appendMove(p, validation));
+    setPath((p) => appendMove(p, next));
     setDraft("");
-    setValidation(null);
     flashMessage(`accepted: ${preview.word}`);
   }
 
@@ -181,10 +197,23 @@ export default function Home() {
   }
 
   function handleReset() {
-    setPath(makeInitialPath());
+    setPath(makeInitialPath(startWord));
     setDraft("");
-    setValidation(null);
-    flashMessage("reset to start");
+    flashMessage(`reset to ${startWord}`);
+  }
+
+  function commitStartWord(next: string) {
+    const trimmed = next.trim().toLowerCase();
+    if (!trimmed) return;
+    const unsupported = getUnsupportedWordReason(trimmed);
+    if (unsupported) {
+      flashMessage(unsupported);
+      return;
+    }
+    setStartWord(trimmed);
+    setPath(makeInitialPath(trimmed));
+    setDraft("");
+    flashMessage(`new start: ${trimmed}`);
   }
 
   function addCustomWord(word: string) {
@@ -193,27 +222,27 @@ export default function Home() {
       flashMessage(unsupported);
       return;
     }
-    const next = saveCustomWord(word);
-    setCustomWords(next);
+    const nextWords = saveCustomWord(word);
+    setCustomWords(nextWords);
     setManualWord("");
     flashMessage(`${word.trim()} added`);
   }
 
+  // Suggestions: cheap to compute against the current word, recomputed only when the
+  // current word or dictionary actually changes.
   const dockSuggestions = useMemo(() => {
-    if (!currentEntry || dictionaryContext.allWords.length === 0) return [] as string[];
-    if (suggestions.length > 0) return suggestions.slice(0, 3).map((s) => s.word);
-    const cheap = suggestNextWords(
+    if (!currentEntry || dictionaryContext.allWords.length === 0) {
+      return [] as string[];
+    }
+    return suggestNextWords(
       currentEntry.word.raw,
       dictionaryContext.allWords,
       settings,
       dictionaryContext
-    );
-    return cheap.slice(0, 3).map((s) => s.word);
-  }, [currentEntry, dictionaryContext, settings, suggestions]);
-
-  useEffect(() => {
-    setSuggestions([]);
-  }, [path.length]);
+    )
+      .slice(0, 3)
+      .map((s) => s.word);
+  }, [currentEntry, dictionaryContext, settings]);
 
   const buttonLabel = preview ? (canAccept ? "accept" : "verify") : "verify";
 
@@ -264,25 +293,22 @@ export default function Home() {
         >
           <div style={{ flex: 1, minHeight: 12 }} />
 
-          {path.map((entry, i) => {
+          {pathWithOps.map((entry, i) => {
             const isStart = i === 0;
-            const op: ChainOp | null = isStart
-              ? null
-              : classifyChain(path[i - 1].word.raw, entry.word.raw);
             return (
               <Fragment key={i + "-" + entry.word.raw}>
-                {!isStart && op ? (
+                {!isStart && entry.op ? (
                   <div className="bridge-in">
-                    <Bridge op={op} />
+                    <Bridge op={entry.op} />
                   </div>
                 ) : null}
                 <div className="row-in">
                   <WordRow
                     word={entry.word.raw}
-                    op={op}
+                    op={entry.op}
                     isStart={isStart}
                     index={i}
-                    latest={i === path.length - 1 && !preview}
+                    latest={i === pathWithOps.length - 1 && !preview}
                   />
                   {isStart ? <StartCaption /> : null}
                 </div>
@@ -352,6 +378,7 @@ export default function Home() {
               {dictionaryError}
             </div>
           ) : null}
+          <StartWordControl current={startWord} onCommit={commitStartWord} />
           <SettingsPanel settings={settings} onChange={setSettings} />
           <CustomWordsPanel
             customWords={customWords}
@@ -373,7 +400,7 @@ function StartCaption() {
       style={{
         textAlign: "center",
         margin: "6px 0 14px",
-        fontFamily: '"Instrument Serif", serif',
+        fontFamily: 'var(--font-instrument-serif), "Instrument Serif", serif',
         fontSize: 18,
         fontStyle: "italic",
         color: "var(--moss)"
@@ -401,7 +428,7 @@ function PreviewCaption({
           textAlign: "center",
           marginTop: 6,
           color: "var(--del)",
-          fontFamily: '"Geist Mono", monospace',
+          fontFamily: 'var(--font-geist-mono), "Geist Mono", monospace',
           fontSize: 11
         }}
       >
@@ -416,7 +443,7 @@ function PreviewCaption({
           textAlign: "center",
           marginTop: 6,
           color: "var(--del)",
-          fontFamily: '"Geist Mono", monospace',
+          fontFamily: 'var(--font-geist-mono), "Geist Mono", monospace',
           fontSize: 11,
           letterSpacing: "0.04em"
         }}
@@ -430,7 +457,7 @@ function PreviewCaption({
       style={{
         textAlign: "center",
         marginTop: 6,
-        fontFamily: '"Geist Mono", monospace',
+        fontFamily: 'var(--font-geist-mono), "Geist Mono", monospace',
         fontSize: 11,
         color: "var(--moss)",
         letterSpacing: "0.04em"
@@ -444,7 +471,7 @@ function PreviewCaption({
           borderRadius: 5,
           background: "#fff",
           border: "1px solid rgba(20,18,12,0.18)",
-          fontFamily: '"Geist Mono", monospace',
+          fontFamily: 'var(--font-geist-mono), "Geist Mono", monospace',
           fontSize: 11
         }}
       >
@@ -452,6 +479,52 @@ function PreviewCaption({
       </kbd>{" "}
       to accept
     </div>
+  );
+}
+
+function StartWordControl({
+  current,
+  onCommit
+}: {
+  current: string;
+  onCommit: (next: string) => void;
+}) {
+  const [draft, setDraft] = useState(current);
+  useEffect(() => {
+    setDraft(current);
+  }, [current]);
+
+  return (
+    <section className="min-w-0 rounded border border-moss/15 bg-white p-4 shadow-sm">
+      <h2 className="text-base font-semibold text-ink">Starting word</h2>
+      <p className="mt-1 text-xs text-moss">
+        Resets the chain to a new opening word.
+      </p>
+      <form
+        className="mt-3 grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"
+        onSubmit={(e) => {
+          e.preventDefault();
+          onCommit(draft);
+        }}
+      >
+        <input
+          className="h-10 w-full min-w-0 rounded border border-moss/25 bg-white px-3 text-sm"
+          onChange={(event) =>
+            setDraft(
+              event.target.value.replace(/[^a-zA-Zàèéìòù'\-]/g, "").toLowerCase()
+            )
+          }
+          placeholder="gioco"
+          value={draft}
+        />
+        <button
+          className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded bg-moss px-3 text-sm font-semibold text-white"
+          type="submit"
+        >
+          Set start
+        </button>
+      </form>
+    </section>
   );
 }
 
@@ -501,7 +574,8 @@ function SidePanel({
           <h2
             style={{
               margin: 0,
-              fontFamily: '"Instrument Serif", serif',
+              fontFamily:
+                'var(--font-instrument-serif), "Instrument Serif", serif',
               fontSize: 28,
               fontWeight: 400
             }}

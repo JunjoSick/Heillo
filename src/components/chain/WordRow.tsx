@@ -58,7 +58,7 @@ export function WordRow({ word, op, isStart, index, latest }: WordRowProps) {
 function stepBadgeStyle(isStart: boolean, ruleType: ChainRule | null): CSSProperties {
   const tint = ruleType ? ruleTint(ruleType) : null;
   return {
-    fontFamily: '"Geist Mono", monospace',
+    fontFamily: 'var(--font-geist-mono), "Geist Mono", monospace',
     fontSize: 11,
     letterSpacing: "0.08em",
     color: isStart ? "var(--paper)" : tint?.c || "var(--moss)",

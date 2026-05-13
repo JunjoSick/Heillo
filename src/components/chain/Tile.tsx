@@ -9,7 +9,6 @@ interface TileProps {
   ruleType?: ChainRule | null;
   size?: Size;
   style?: CSSProperties;
-  label?: string;
   dim?: boolean;
 }
 
@@ -19,7 +18,6 @@ export function Tile({
   ruleType,
   size = "default",
   style,
-  label,
   dim = false
 }: TileProps) {
   const tint = highlight && ruleType ? ruleTint(ruleType) : null;
@@ -39,7 +37,6 @@ export function Tile({
       className={"tile" + sizeClass}
       style={base}
       data-rule={ruleType || ""}
-      aria-label={label}
     >
       {letter}
     </span>

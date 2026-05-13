@@ -44,7 +44,7 @@ body {
   height: 100%;
   background: var(--paper);
   color: var(--ink);
-  font-family: "Geist", ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-geist), "Geist", ui-sans-serif, system-ui, sans-serif;
   font-feature-settings: "ss01", "cv11";
 }
 
@@ -98,7 +98,7 @@ body::before {
   align-items: center;
   justify-content: center;
   border-radius: var(--tile-radius);
-  font-family: "Instrument Serif", "Geist", serif;
+  font-family: var(--font-instrument-serif), "Instrument Serif", var(--font-geist), "Geist", serif;
   font-size: 38px;
   line-height: 1;
   font-weight: 400;
@@ -139,7 +139,7 @@ body::before {
   gap: 6px;
   padding: 4px 10px;
   border-radius: 999px;
-  font-family: "Geist Mono", monospace;
+  font-family: var(--font-geist-mono), "Geist Mono", monospace;
   font-size: 11px;
   letter-spacing: 0.06em;
   text-transform: uppercase;

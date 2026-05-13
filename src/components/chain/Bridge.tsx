@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import { useId, type CSSProperties, type ReactNode } from "react";
 import type { ChainOp } from "./diff";
 
 const HEIGHT = 96;
@@ -75,7 +75,7 @@ function BridgeShell({
         {accentDetail ? (
           <span
             style={{
-              fontFamily: '"Geist Mono", monospace',
+              fontFamily: 'var(--font-geist-mono), "Geist Mono", monospace',
               fontSize: 11,
               color: "var(--moss)",
               paddingLeft: 4
@@ -119,7 +119,7 @@ const plusBadge = (color: string): CSSProperties => ({
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  fontFamily: '"Geist Mono", monospace',
+  fontFamily: 'var(--font-geist-mono), "Geist Mono", monospace',
   fontSize: 13,
   fontWeight: 700,
   lineHeight: 1
@@ -131,6 +131,7 @@ function BridgeSubstitution({
 }: {
   op: Extract<ChainOp, { type: "substitution" }>;
 }) {
+  const arrowId = useId();
   return (
     <BridgeShell
       tint="var(--sub)"
@@ -142,7 +143,7 @@ function BridgeSubstitution({
         <svg width="44" height="22" viewBox="0 0 44 22">
           <defs>
             <marker
-              id="arrSub"
+              id={arrowId}
               markerWidth="6"
               markerHeight="6"
               refX="5"
@@ -158,7 +159,7 @@ function BridgeSubstitution({
             strokeWidth="1.6"
             strokeDasharray="3 3"
             fill="none"
-            markerEnd="url(#arrSub)"
+            markerEnd={`url(#${arrowId})`}
           />
         </svg>
         <span
@@ -407,6 +408,7 @@ function BridgeDeletion({
 
 /* ── 4. SWAP ───────────────────────────────────────────────────── */
 function BridgeSwap({ op }: { op: Extract<ChainOp, { type: "swap" }> }) {
+  const arrowId = useId();
   const a = op.from[0] || "·";
   const b = op.from[1] || "·";
   return (
@@ -473,7 +475,7 @@ function BridgeSwap({ op }: { op: Extract<ChainOp, { type: "swap" }> }) {
         <svg width="60" height="36" viewBox="0 0 60 36">
           <defs>
             <marker
-              id="arrSwp"
+              id={arrowId}
               markerWidth="6"
               markerHeight="6"
               refX="5"
@@ -488,14 +490,14 @@ function BridgeSwap({ op }: { op: Extract<ChainOp, { type: "swap" }> }) {
             fill="none"
             stroke="var(--swp)"
             strokeWidth="1.6"
-            markerEnd="url(#arrSwp)"
+            markerEnd={`url(#${arrowId})`}
           />
           <path
             d="M56 24 Q 30 44, 4 24"
             fill="none"
             stroke="var(--swp)"
             strokeWidth="1.6"
-            markerEnd="url(#arrSwp)"
+            markerEnd={`url(#${arrowId})`}
           />
         </svg>
         <div style={{ display: "flex", gap: 4 }}>
@@ -533,6 +535,7 @@ function BridgeLengthening({
 }: {
   op: Extract<ChainOp, { type: "lengthening" }>;
 }) {
+  const arrowId = useId();
   return (
     <BridgeShell
       tint="var(--len)"
@@ -553,7 +556,7 @@ function BridgeLengthening({
         <svg width="46" height="44" viewBox="0 0 46 44">
           <defs>
             <marker
-              id="arrLen"
+              id={arrowId}
               markerWidth="6"
               markerHeight="6"
               refX="5"
@@ -568,14 +571,14 @@ function BridgeLengthening({
             fill="none"
             stroke="var(--len)"
             strokeWidth="1.6"
-            markerEnd="url(#arrLen)"
+            markerEnd={`url(#${arrowId})`}
           />
           <path
             d="M4 22 L20 22 Q 26 22, 28 30 L 40 38"
             fill="none"
             stroke="var(--len)"
             strokeWidth="1.6"
-            markerEnd="url(#arrLen)"
+            markerEnd={`url(#${arrowId})`}
           />
         </svg>
         <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
@@ -622,7 +625,7 @@ function BridgeLengthening({
               color: "#fff",
               fontSize: 10,
               fontWeight: 700,
-              fontFamily: '"Geist Mono", monospace'
+              fontFamily: 'var(--font-geist-mono), "Geist Mono", monospace'
             }}
           >
             ×2
@@ -639,6 +642,7 @@ function BridgeShortening({
 }: {
   op: Extract<ChainOp, { type: "shortening" }>;
 }) {
+  const arrowId = useId();
   return (
     <BridgeShell
       tint="var(--shr)"
@@ -675,7 +679,7 @@ function BridgeShortening({
         <svg width="46" height="44" viewBox="0 0 46 44">
           <defs>
             <marker
-              id="arrShr"
+              id={arrowId}
               markerWidth="6"
               markerHeight="6"
               refX="5"
@@ -690,7 +694,7 @@ function BridgeShortening({
             fill="none"
             stroke="var(--shr)"
             strokeWidth="1.6"
-            markerEnd="url(#arrShr)"
+            markerEnd={`url(#${arrowId})`}
           />
           <path
             d="M4 38 L 16 30 Q 22 22, 26 22 L 42 22"
@@ -723,7 +727,7 @@ function BridgeShortening({
             color: "#fff",
             fontSize: 10,
             fontWeight: 700,
-            fontFamily: '"Geist Mono", monospace'
+            fontFamily: 'var(--font-geist-mono), "Geist Mono", monospace'
           }}
         >
           ÷2
@@ -739,6 +743,7 @@ function BridgeCluster({
 }: {
   op: Extract<ChainOp, { type: "cluster-change" }>;
 }) {
+  const arrowId = useId();
   return (
     <BridgeShell
       tint="var(--clu)"
@@ -767,7 +772,7 @@ function BridgeCluster({
         <svg width="40" height="32" viewBox="0 0 40 32">
           <defs>
             <marker
-              id="arrClu"
+              id={arrowId}
               markerWidth="6"
               markerHeight="6"
               refX="5"
@@ -782,14 +787,14 @@ function BridgeCluster({
             fill="none"
             stroke="var(--clu)"
             strokeWidth="1.5"
-            markerEnd="url(#arrClu)"
+            markerEnd={`url(#${arrowId})`}
           />
           <path
             d="M2 22 Q 20 34, 38 22"
             fill="none"
             stroke="var(--clu)"
             strokeWidth="1.5"
-            markerEnd="url(#arrClu)"
+            markerEnd={`url(#${arrowId})`}
             strokeDasharray="3 3"
           />
         </svg>

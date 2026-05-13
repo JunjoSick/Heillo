@@ -75,7 +75,7 @@ export function DockInput({
         >
           <span
             style={{
-              fontFamily: '"Geist Mono", monospace',
+              fontFamily: 'var(--font-geist-mono), "Geist Mono", monospace',
               fontSize: 10,
               color: "var(--moss)",
               letterSpacing: "0.06em"
@@ -85,7 +85,7 @@ export function DockInput({
           </span>
           <span
             style={{
-              fontFamily: '"Instrument Serif", serif',
+              fontFamily: 'var(--font-instrument-serif), "Instrument Serif", serif',
               fontSize: 24,
               lineHeight: 1
             }}
@@ -112,7 +112,7 @@ export function DockInput({
               background: "#fff",
               border: "1.5px solid rgba(20,18,12,0.18)",
               borderRadius: 12,
-              fontFamily: '"Instrument Serif", serif',
+              fontFamily: 'var(--font-instrument-serif), "Instrument Serif", serif',
               fontSize: 28,
               fontWeight: 400,
               outline: "none",
@@ -126,7 +126,7 @@ export function DockInput({
                 right: 120,
                 top: "50%",
                 transform: "translateY(-50%)",
-                fontFamily: '"Geist Mono", monospace',
+                fontFamily: 'var(--font-geist-mono), "Geist Mono", monospace',
                 fontSize: 10,
                 color: "var(--moss)"
               }}
@@ -147,7 +147,7 @@ export function DockInput({
               borderRadius: 8,
               background: canAccept ? "var(--ink)" : "rgba(20,18,12,0.1)",
               color: canAccept ? "var(--paper)" : "var(--moss)",
-              fontFamily: '"Geist Mono", monospace',
+              fontFamily: 'var(--font-geist-mono), "Geist Mono", monospace',
               fontSize: 12,
               fontWeight: 600,
               letterSpacing: "0.08em",
@@ -175,7 +175,7 @@ export function DockInput({
           margin: "8px auto 0",
           maxWidth: 720,
           textAlign: "center",
-          fontFamily: '"Geist Mono", monospace',
+          fontFamily: 'var(--font-geist-mono), "Geist Mono", monospace',
           fontSize: 10,
           color: "var(--moss)",
           letterSpacing: "0.06em",
@@ -203,7 +203,7 @@ export function DockInput({
                     borderRadius: 999,
                     border: "1px solid rgba(20,18,12,0.15)",
                     background: "#fff",
-                    fontFamily: '"Geist Mono", monospace',
+                    fontFamily: 'var(--font-geist-mono), "Geist Mono", monospace',
                     fontSize: 10,
                     color: "var(--ink)",
                     textTransform: "lowercase",
