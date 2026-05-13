@@ -1,12 +1,13 @@
 import type { CSSProperties } from "react";
-import { ruleTint, type ChainRule } from "./diff";
+import { ruleTint } from "./bridge/bridgeUtils";
+import type { VisualRuleType } from "./visualOps";
 
 type Size = "default" | "small" | "tiny";
 
 interface TileProps {
   letter: string;
   highlight?: boolean;
-  ruleType?: ChainRule | null;
+  ruleType?: VisualRuleType | null;
   size?: Size;
   style?: CSSProperties;
   dim?: boolean;

@@ -9,11 +9,17 @@ import {
   useState
 } from "react";
 import { Bridge } from "@/components/chain/Bridge";
-import { DockInput } from "@/components/chain/DockInput";
+import { DockInput, type DockSuggestion } from "@/components/chain/DockInput";
 import { Legend } from "@/components/chain/Legend";
 import { TopBar } from "@/components/chain/TopBar";
 import { WordRow } from "@/components/chain/WordRow";
+import { chainOpToVisualChanges } from "@/components/chain/chainOpToVisualChanges";
 import { classifyChain, type ChainOp } from "@/components/chain/diff";
+import { moveValidationToVisualChanges } from "@/components/chain/moveValidationToVisualChanges";
+import type {
+  VisualChange,
+  VisualOpSource
+} from "@/components/chain/visualOps";
 import { CustomWordsPanel } from "@/components/CustomWordsPanel";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import {
@@ -43,6 +49,8 @@ function makeInitialPath(startWord: string): PathEntry[] {
 
 interface PathEntryWithOp extends PathEntry {
   op: ChainOp | null;
+  visualSource: VisualOpSource;
+  visualChanges: VisualChange[];
 }
 
 export default function Home() {
@@ -92,14 +100,39 @@ export default function Home() {
     [dictionary, customWords]
   );
 
-  // Classify every chain transition once per path change.
+  // Accepted entries are driven by MoveValidation.changes (phonetic truth).
+  // Only the rare fallback case (entry without a stored move) gets a
+  // spelling-level op for row highlights.
   const pathWithOps: PathEntryWithOp[] = useMemo(
     () =>
-      path.map((entry, i) => ({
-        ...entry,
-        op:
-          i === 0 ? null : classifyChain(path[i - 1].word.raw, entry.word.raw)
-      })),
+      path.map((entry, i) => {
+        if (i === 0) {
+          return {
+            ...entry,
+            op: null,
+            visualSource: { kind: "start" as const },
+            visualChanges: []
+          };
+        }
+        if (entry.move) {
+          return {
+            ...entry,
+            op: null,
+            visualSource: {
+              kind: "validated-phonetic" as const,
+              validation: entry.move
+            },
+            visualChanges: moveValidationToVisualChanges(entry.move)
+          };
+        }
+        const op = classifyChain(path[i - 1].word.raw, entry.word.raw);
+        return {
+          ...entry,
+          op,
+          visualSource: { kind: "tentative-spelling-preview" as const, op },
+          visualChanges: chainOpToVisualChanges(op)
+        };
+      }),
     [path]
   );
 
@@ -151,6 +184,30 @@ export default function Home() {
       preview &&
       preview.word === deferredPreview.word
   );
+
+  // The preview row prefers validated-phonetic visuals once validation has
+  // caught up to the live draft, falling back to a spelling-preview otherwise.
+  const previewVisualState: {
+    changes: VisualChange[];
+    source: "validated-phonetic" | "tentative-spelling-preview";
+  } | null = useMemo(() => {
+    if (!preview) return null;
+    if (
+      validation &&
+      deferredPreview &&
+      preview.word === deferredPreview.word &&
+      casefoldTrim(validation.to.raw) === casefoldTrim(preview.word)
+    ) {
+      return {
+        changes: moveValidationToVisualChanges(validation),
+        source: "validated-phonetic"
+      };
+    }
+    return {
+      changes: chainOpToVisualChanges(preview.op),
+      source: "tentative-spelling-preview"
+    };
+  }, [preview, deferredPreview, validation]);
 
   // Auto-scroll to bottom when path grows or preview changes.
   useEffect(() => {
@@ -243,12 +300,12 @@ export default function Home() {
   const deferredCurrentEntry = useDeferredValue(currentEntry);
   const deferredDictionaryContext = useDeferredValue(dictionaryContext);
   const deferredSettings = useDeferredValue(settings);
-  const dockSuggestions = useMemo(() => {
+  const dockSuggestions: DockSuggestion[] = useMemo(() => {
     if (
       !deferredCurrentEntry ||
       deferredDictionaryContext.allWords.length === 0
     ) {
-      return [] as string[];
+      return [];
     }
     return suggestNextWords(
       deferredCurrentEntry.word.raw,
@@ -257,7 +314,12 @@ export default function Home() {
       deferredDictionaryContext
     )
       .slice(0, 3)
-      .map((s) => s.word);
+      .map((s) => ({
+        word: s.word,
+        visualChanges: moveValidationToVisualChanges(s.validation),
+        cost: s.validation.cost,
+        className: s.validation.class
+      }));
   }, [deferredCurrentEntry, deferredDictionaryContext, deferredSettings]);
 
   const buttonLabel = preview ? (canAccept ? "accept" : "verify") : "verify";
@@ -313,9 +375,16 @@ export default function Home() {
             const isStart = i === 0;
             return (
               <Fragment key={i + "-" + entry.word.raw}>
-                {!isStart && entry.op ? (
+                {!isStart ? (
                   <div className="bridge-in">
-                    <Bridge op={entry.op} />
+                    <Bridge
+                      visualChanges={entry.visualChanges}
+                      source={
+                        entry.visualSource.kind === "start"
+                          ? "validated-phonetic"
+                          : entry.visualSource.kind
+                      }
+                    />
                   </div>
                 ) : null}
                 <div className="row-in">
@@ -325,17 +394,25 @@ export default function Home() {
                     isStart={isStart}
                     index={i}
                     latest={i === pathWithOps.length - 1 && !preview}
+                    phonemes={entry.word.phonemes}
+                    visualChanges={entry.visualChanges}
                   />
+                  {!isStart && entry.move ? (
+                    <DebugDisclosure move={entry.move} />
+                  ) : null}
                   {isStart ? <StartCaption /> : null}
                 </div>
               </Fragment>
             );
           })}
 
-          {preview ? (
+          {preview && previewVisualState ? (
             <>
               <div className="bridge-in" key={"pv-br-" + preview.word}>
-                <Bridge op={preview.op} />
+                <Bridge
+                  visualChanges={previewVisualState.changes}
+                  source={previewVisualState.source}
+                />
               </div>
               <div
                 className="row-in"
@@ -344,10 +421,16 @@ export default function Home() {
               >
                 <WordRow
                   word={preview.word}
-                  op={preview.op}
+                  op={
+                    previewVisualState.source === "tentative-spelling-preview"
+                      ? preview.op
+                      : null
+                  }
                   isStart={false}
                   index={path.length}
                   latest
+                  phonemes={makePhoneticWord(preview.word).phonemes}
+                  visualChanges={previewVisualState.changes}
                 />
                 <PreviewCaption
                   op={preview.op}
@@ -544,6 +627,84 @@ function StartWordControl({
       </form>
     </section>
   );
+}
+
+function DebugDisclosure({ move }: { move: MoveValidation }) {
+  return (
+    <details
+      style={{
+        margin: "6px auto 0",
+        maxWidth: 560,
+        fontFamily: 'var(--font-geist-mono), "Geist Mono", monospace',
+        fontSize: 10,
+        color: "var(--moss)"
+      }}
+    >
+      <summary
+        style={{
+          cursor: "pointer",
+          textAlign: "center",
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          opacity: 0.6
+        }}
+      >
+        debug phonetics
+      </summary>
+      <div
+        style={{
+          marginTop: 6,
+          padding: "8px 10px",
+          borderRadius: 8,
+          background: "var(--paper-2)",
+          border: "1px solid rgba(20,18,12,0.08)",
+          color: "var(--ink)",
+          lineHeight: 1.5,
+          whiteSpace: "pre-wrap"
+        }}
+      >
+        <div>
+          <strong>from</strong> {move.from.raw} · {move.from.normalized} · [
+          {move.from.phonemes.join(" ")}]
+        </div>
+        <div>
+          <strong>to</strong> {move.to.raw} · {move.to.normalized} · [
+          {move.to.phonemes.join(" ")}]
+        </div>
+        <div>
+          <strong>class</strong> {move.class} · <strong>cost</strong>{" "}
+          {move.cost.toFixed(2)} · <strong>compound</strong>{" "}
+          {move.isCompound ? "yes" : "no"} · <strong>changes</strong>{" "}
+          {move.meaningfulChangeCount}
+        </div>
+        <div>
+          <strong>lexical</strong> {move.lexical.source} ·{" "}
+          <strong>acceptAsProgress</strong>{" "}
+          {move.acceptAsProgress ? "yes" : "no"} ·{" "}
+          <strong>homophone</strong> {move.homophoneMove ? "yes" : "no"}
+        </div>
+        {move.changes.length > 0 ? (
+          <div style={{ marginTop: 4 }}>
+            <strong>changes</strong>{" "}
+            {move.changes
+              .map(
+                (c) =>
+                  `${c.type}[${stringifyTokens(c.from)}→${stringifyTokens(c.to)} @${c.cost}]`
+              )
+              .join("  ")}
+          </div>
+        ) : null}
+      </div>
+    </details>
+  );
+}
+
+function stringifyTokens(
+  v: MoveValidation["changes"][number]["from"] | MoveValidation["changes"][number]["to"]
+): string {
+  if (v === undefined) return "∅";
+  if (Array.isArray(v)) return v.join("");
+  return String(v);
 }
 
 function SidePanel({
