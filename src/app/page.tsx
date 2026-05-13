@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Play, Search } from "lucide-react";
+import { Check, Play, Search } from "lucide-react";
 import { CustomWordsPanel } from "@/components/CustomWordsPanel";
 import { MoveResult } from "@/components/MoveResult";
 import { OnboardingBox } from "@/components/OnboardingBox";
@@ -18,6 +18,7 @@ import { exportCustomWords } from "@/lib/dictionary/exportCustomWords";
 import { loadDictionary } from "@/lib/dictionary/loadDictionary";
 import { prepareDictionaryContext } from "@/lib/dictionary/dictionaryContext";
 import {
+  casefoldTrim,
   getUnsupportedWordReason,
   makePhoneticWord,
   suggestNextWords,
@@ -101,9 +102,23 @@ export default function Home() {
     setMessage(null);
   }
 
+  function canAcceptVerifiedCandidate(word: string): boolean {
+    return Boolean(
+      validation &&
+        acceptance?.accepted &&
+        casefoldTrim(word) === casefoldTrim(validation.to.raw) &&
+        currentEntry?.word.normalized === validation.from.normalized
+    );
+  }
+
   function verifyCandidate(word = candidateInput) {
     if (!currentEntry) {
       setMessage("Start a word before verifying a candidate.");
+      return;
+    }
+
+    if (canAcceptVerifiedCandidate(word)) {
+      acceptMove();
       return;
     }
 
@@ -196,7 +211,7 @@ export default function Home() {
       </section>
 
       <div className="mx-auto grid max-w-7xl gap-5 px-4 py-5 lg:grid-cols-[minmax(0,1fr)_24rem] lg:px-6">
-        <div className="grid gap-5">
+        <div className="grid min-w-0 gap-5">
           <section className="rounded border border-moss/15 bg-white p-4 shadow-sm">
             <WordInput
               buttonLabel="Start"
@@ -223,9 +238,9 @@ export default function Home() {
 
           <section className="rounded border border-moss/15 bg-white p-4 shadow-sm">
             <WordInput
-              buttonLabel="Verify"
+              buttonLabel={canAcceptVerifiedCandidate(candidateInput) ? "Accept" : "Verify"}
               disabled={!currentEntry}
-              icon={Search}
+              icon={canAcceptVerifiedCandidate(candidateInput) ? Check : Search}
               label="Next word"
               onChange={setCandidateInput}
               onSubmit={() => verifyCandidate()}
@@ -269,7 +284,7 @@ export default function Home() {
           <OnboardingBox />
         </div>
 
-        <aside className="grid content-start gap-5">
+        <aside className="grid min-w-0 content-start gap-5">
           <SettingsPanel onChange={setSettings} settings={settings} />
           <CustomWordsPanel
             customWords={customWords}
