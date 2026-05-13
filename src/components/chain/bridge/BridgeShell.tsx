@@ -37,29 +37,12 @@ export function BridgeShell({
       };
 
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "36px 1fr 130px",
-        alignItems: "center",
-        columnGap: 12,
-        padding: "8px 0",
-        minHeight: 96
-      }}
-    >
-      <div style={{ display: "flex", justifyContent: "center" }}>
+    <div className="bridge-shell">
+      <div className="bridge-rail">
         <div style={railStyle} />
       </div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center"
-        }}
-      >
-        {children}
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <div className="bridge-body">{children}</div>
+      <div className="bridge-label">
         <span
           className="pill"
           style={{
@@ -73,31 +56,9 @@ export function BridgeShell({
           {accentLabel}
         </span>
         {accentDetail ? (
-          <span
-            style={{
-              fontFamily: 'var(--font-geist-mono), "Geist Mono", monospace',
-              fontSize: 11,
-              color: "var(--moss)",
-              paddingLeft: 4
-            }}
-          >
-            {accentDetail}
-          </span>
+          <span className="bridge-detail">{accentDetail}</span>
         ) : null}
-        {isPreview ? (
-          <span
-            style={{
-              fontFamily: 'var(--font-geist-mono), "Geist Mono", monospace',
-              fontSize: 9,
-              color: "var(--moss-soft)",
-              paddingLeft: 4,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase"
-            }}
-          >
-            preview
-          </span>
-        ) : null}
+        {isPreview ? <span className="bridge-preview-tag">preview</span> : null}
       </div>
     </div>
   );
