@@ -317,6 +317,17 @@ export function weightedEditDistance(
         }
       }
     }
+
+    if (
+      maxCost !== undefined &&
+      Math.min(...grid[i].map((cell) => cell.cost)) > maxCost
+    ) {
+      return {
+        cost: Infinity,
+        changes: [],
+        alignment: null
+      };
+    }
   }
 
   const result = grid[from.length][to.length];
