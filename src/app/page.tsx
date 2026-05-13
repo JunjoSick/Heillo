@@ -370,9 +370,16 @@ export default function Home() {
             const isStart = i === 0;
             return (
               <Fragment key={i + "-" + entry.word.raw}>
-                {!isStart && entry.op ? (
+                {!isStart ? (
                   <div className="bridge-in">
-                    <Bridge op={entry.op} />
+                    <Bridge
+                      visualChanges={entry.visualChanges}
+                      source={
+                        entry.visualSource.kind === "start"
+                          ? "validated-phonetic"
+                          : entry.visualSource.kind
+                      }
+                    />
                   </div>
                 ) : null}
                 <div className="row-in">
@@ -389,10 +396,13 @@ export default function Home() {
             );
           })}
 
-          {preview ? (
+          {preview && previewVisualState ? (
             <>
               <div className="bridge-in" key={"pv-br-" + preview.word}>
-                <Bridge op={preview.op} />
+                <Bridge
+                  visualChanges={previewVisualState.changes}
+                  source={previewVisualState.source}
+                />
               </div>
               <div
                 className="row-in"
